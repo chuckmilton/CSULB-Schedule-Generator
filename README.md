@@ -1,9 +1,7 @@
 # CSULB Schedule Generator
 The CSULB Schedule Generator is a Python project that is designed to streamline the process of creating a personalized course schedule for your academic semester. It accomplishes this by scraping information from CSULB's course catalog and then generating all possible combinations of schedules while ensuring that there are no time conflicts in between each course.
 
-The process of finding and enrolling for courses at CSULB can be time-consuming and at times frustrating. A student registering for classes must make sure that each course does not have any time conflicts with the other and they also have to make sure that each course has seats available in the first place. 
-
-The goal of this generator is to make schedule planning for CSULB easier and registering for courses faster. With this tool, students can save their time registering for classes without having to worry about any time conflicts and seat availability.
+The goal of this generator is to make schedule planning for CSULB easier, faster, and more accessible for students.
 
 ## How It Works
 * The generator utilizes web scraping to fetch course information from CSULB's course catalog.
@@ -12,6 +10,16 @@ The goal of this generator is to make schedule planning for CSULB easier and reg
 * The data is also stored in a SQLite database for later use.
 * You can filter the course data by selecting certain courses you want to take.
 * After doing so, the generator interefaces with the "combo_generator" module to provide schedule combinations of available courses that avoid time conflicts.
+
+## CSULB Schedule Generator vs. CSULB's Schedule Planner
+Pros:
+* CSULB Schedule Generator does not require student login, therefore easier access.
+* Less steps, therefore faster process.
+* According to other students, CSULB's Schedule Planner tends to have glitches sometimes.
+
+Cons:
+* Must webscrape CSULB's course catalog while CSULB's Schedule Planner has direct access data.
+* CSULB's Schedule Planner is able to directly import the courses from your planned schedule into your enrollment shopping cart.
 
 ### Disclaimer
 This project was created for educational/demonstrative purposes. 
