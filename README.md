@@ -15,7 +15,7 @@ The goal of this generator is to make schedule planning for CSULB easier, faster
 Pros:
 * CSULB Schedule Generator does not require student login, therefore easier access.
 * Less steps, therefore faster process.
-* According to other students, CSULB's Schedule Planner tends to have glitches sometimes.
+* According to other students, CSULB's Schedule Planner can sometimes have glitches.
 
 Cons:
 * Must webscrape CSULB's course catalog while CSULB's Schedule Planner has direct access data.
