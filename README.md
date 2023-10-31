@@ -18,7 +18,7 @@ Pros:
 * According to other students, CSULB's Schedule Planner can sometimes have glitches.
 
 Cons:
-* Must webscrape CSULB's course catalog while CSULB's Schedule Planner has direct access data.
+* Must webscrape CSULB's course catalog while CSULB's Schedule Planner has direct access to the data.
 * CSULB's Schedule Planner is able to directly import the courses from your planned schedule into your enrollment shopping cart.
 
 ### Disclaimer
