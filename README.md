@@ -1,5 +1,5 @@
 # CSULB Schedule Generator
-The CSULB Schedule Generator is a Python project that is designed to streamline the process of creating a personalized course schedule for your academic semester. It accomplishes this by scraping information from CSULB's course catalog and then generating all possible combinations of schedules while ensuring that there are no time conflicts in between each course.
+The CSULB Schedule Generator is a personal Python project that is designed to streamline the process of creating a personalized course schedule for your academic semester. It accomplishes this by scraping information from CSULB's course catalog and then generating all possible combinations of schedules while ensuring that there are no time conflicts in between each course.
 
 The goal of this generator is to make schedule planning for CSULB easier, faster, and more accessible for students.
 
