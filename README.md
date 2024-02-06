@@ -21,6 +21,10 @@ Cons:
 * Must webscrape CSULB's course catalog while CSULB's Schedule Planner has direct access to the data.
 * CSULB's Schedule Planner is able to directly import the courses from your planned schedule into your enrollment shopping cart.
 
+## How to set up
+* pip install requests
+* pip install beautifulsoup4
+
 ### Disclaimer
 This project was created for educational/demonstrative purposes. 
 I have no affiliation with any of CSULB's sites and neither I nor the software will be held liable for any consequences resulting from its use. 
