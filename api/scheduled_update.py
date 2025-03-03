@@ -31,8 +31,6 @@ def save_courses_to_cache(semester, data):
 def scheduled_update():
     # Loop through all subject codes and scrape course data.
     all_course_data = []
-    print(all_course_data)
-    print("HI")
     for subject_code in scraper.subject_codes:
         data = scraper.courses(CURRENT_SEMESTER, subject_code)
         all_course_data.extend(data)
