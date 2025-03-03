@@ -28,7 +28,7 @@ def get_current_semester():
     else:
         return f"Spring_{year}"
 
-CURRENT_SEMESTER = get_current_semester()  # For testing purposes; you can also use get_current_semester()
+CURRENT_SEMESTER = get_current_semester()
 
 def load_cached_courses(semester, cache_age_limit=6 * 3600):
     cache_file = os.path.join("/tmp", f"cache_{semester}.json")
