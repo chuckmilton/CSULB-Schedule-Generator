@@ -1,14 +1,9 @@
-# api/scheduled_update.py
-from flask import Flask
 import os
 import json
-import time
-import sys
 from datetime import date
+import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from scraper import scraper
-
-app = Flask(__name__)
 
 def get_current_semester():
     today = date.today()
@@ -27,15 +22,16 @@ def save_courses_to_cache(semester, data):
     with open(cache_file, "w", encoding="utf-8") as f:
         json.dump(data, f)
 
-@app.route("/", methods=["GET"])
-def scheduled_update():
-    # Loop through all subject codes and scrape course data.
+# Run scraping and save data
+def run_scraper():
     all_course_data = []
-    for subject_code in scraper.subject_codes:
-        data = scraper.courses(CURRENT_SEMESTER, subject_code)
-        all_course_data.extend(data)
-    save_courses_to_cache(CURRENT_SEMESTER, all_course_data)
-    return "Course data updated.", 200
+    try:
+        for subject_code in scraper.subject_codes:
+            data = scraper.courses(CURRENT_SEMESTER, subject_code)
+            all_course_data.extend(data)
+        save_courses_to_cache(CURRENT_SEMESTER, all_course_data)
+    except Exception:
+        pass
 
 if __name__ == "__main__":
-    app.run()
+    run_scraper()

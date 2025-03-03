@@ -8,6 +8,7 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from scraper import scraper
 from utils import time_test
+from scheduled_update import run_scraper
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY")
@@ -30,18 +31,16 @@ def get_current_semester():
 
 CURRENT_SEMESTER = get_current_semester()
 
-def load_cached_courses(semester, cache_age_limit=6 * 3600):
+def load_cached_courses(semester):
     cache_file = os.path.join("/tmp", f"cache_{semester}.json")
     if os.path.exists(cache_file):
-        age = time.time() - os.path.getmtime(cache_file)
-        if age < cache_age_limit:
-            with open(cache_file, "r", encoding="utf-8") as f:
-                try:
-                    data = json.load(f)
-                    return data, os.path.getmtime(cache_file)
-                except Exception:
-                    return None, None
-    return None, None
+        with open(cache_file, "r", encoding="utf-8") as f:
+            try:
+                data = json.load(f)
+                return data
+            except Exception:
+                return None
+    return None
 
 def save_courses_to_cache(semester, courses):
     cache_file = os.path.join("/tmp", f"cache_{semester}.json")
@@ -346,7 +345,7 @@ def datetimeformat(value):
 
 @app.route("/", methods=["GET"])
 def index():
-    data, _ = load_cached_courses(CURRENT_SEMESTER)
+    data = load_cached_courses(CURRENT_SEMESTER)
     if data is None:
         data = {"courses": []}
         last_updated = None
@@ -398,7 +397,7 @@ def generate():
             exclude_custom.append((day.strip(), start.strip(), end.strip()))
     session["exclude_custom"] = exclude_custom
 
-    data, _ = load_cached_courses(CURRENT_SEMESTER)
+    data = load_cached_courses(CURRENT_SEMESTER)
     if data is None:
         courses_data = scraper.fetch_and_store_courses(CURRENT_SEMESTER)
         if not courses_data:
@@ -566,6 +565,11 @@ class WSGIAdapter(BaseHTTPRequestHandler):
         self.wfile.write(response_body)
 
 handler = WSGIAdapter
+
+@app.route("/api/scheduled_update", methods=["GET"])
+def scheduled_update():
+    run_scraper()
+    return jsonify({"message": "Course data updated successfully"}), 200
 
 if __name__ == "__main__":
     app.run(debug=True)
