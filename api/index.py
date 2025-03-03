@@ -8,7 +8,7 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from scraper import scraper
 from utils import time_test
-from scheduled_update import run_scraper
+from api.scheduled_update import run_scraper
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY")
