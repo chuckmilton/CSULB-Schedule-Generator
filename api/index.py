@@ -31,7 +31,7 @@ def get_current_semester():
 CURRENT_SEMESTER = get_current_semester()  # or set a fixed value for testing
 
 def load_cached_courses(semester, cache_age_limit=6 * 3600):
-    cache_file = f"cache_{semester}.json"
+    cache_file = os.path.join("/tmp", f"cache_{semester}.json")
     if os.path.exists(cache_file):
         age = time.time() - os.path.getmtime(cache_file)
         if age < cache_age_limit:
@@ -43,7 +43,7 @@ def load_cached_courses(semester, cache_age_limit=6 * 3600):
     return None
 
 def save_courses_to_cache(semester, data):
-    cache_file = f"cache_{semester}.json"
+    cache_file = os.path.join("/tmp", f"cache_{semester}.json")
     with open(cache_file, "w", encoding="utf-8") as f:
         json.dump(data, f)
 
@@ -154,6 +154,7 @@ def scrape_courses():
         for i, subject_code in enumerate(subject_codes, start=1):
             data = scraper.courses(CURRENT_SEMESTER, subject_code)
             all_course_data.extend(data)
+            print(data)
             progress = int((i / total) * 100)
             yield f"data: {progress}\n\n"
         save_courses_to_cache(CURRENT_SEMESTER, all_course_data)
@@ -585,7 +586,65 @@ def generate():
     combination_count = len(filtered_combinations)
     return render_template_string(result_template, calendars=calendars, combination_count=combination_count, online_sections=online_sections)
 
-handler = app
+from http.server import BaseHTTPRequestHandler
+from io import BytesIO
+from urllib.parse import urlparse
+
+class WSGIAdapter(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.wsgi_handle()
+
+    def do_POST(self):
+        self.wsgi_handle()
+
+    def wsgi_handle(self):
+        # Build a minimal WSGI environment.
+        environ = {}
+        environ['REQUEST_METHOD'] = self.command
+        parsed_url = urlparse(self.path)
+        environ['PATH_INFO'] = parsed_url.path
+        environ['QUERY_STRING'] = parsed_url.query
+        environ['SERVER_NAME'] = self.server.server_address[0]
+        environ['SERVER_PORT'] = str(self.server.server_address[1])
+        environ['wsgi.input'] = self.rfile
+        environ['wsgi.errors'] = sys.stderr
+        environ['wsgi.version'] = (1, 0)
+        environ['wsgi.multithread'] = False
+        environ['wsgi.multiprocess'] = False
+        environ['wsgi.run_once'] = False
+
+        # Add required key:
+        environ['wsgi.url_scheme'] = 'http'
+
+        # Pass along content headers.
+        length = self.headers.get('Content-Length')
+        if length:
+            environ['CONTENT_LENGTH'] = length
+        environ['CONTENT_TYPE'] = self.headers.get('Content-Type', '')
+
+        response_status = None
+        response_headers = None
+
+        def start_response(status, headers, exc_info=None):
+            nonlocal response_status, response_headers
+            response_status = status
+            response_headers = headers
+            return lambda x: None
+
+        # Call your Flask app.
+        result = app(environ, start_response)
+        response_body = b"".join(result)
+
+        # Send response status and headers.
+        self.send_response(int(response_status.split()[0]))
+        for header, value in response_headers:
+            self.send_header(header, value)
+        self.end_headers()
+        self.wfile.write(response_body)
+
+# === Export the Adapter as the Handler ===
+handler = WSGIAdapter
+
 
 if __name__ == "__main__":
     app.run(debug=True)
