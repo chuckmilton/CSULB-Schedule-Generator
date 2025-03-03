@@ -9,6 +9,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from scraper import scraper
 from utils import time_test
 from api.scheduled_update import run_scraper
+import threading
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY")
@@ -566,10 +567,15 @@ class WSGIAdapter(BaseHTTPRequestHandler):
 
 handler = WSGIAdapter
 
+def run_scraper_async():
+    """Run scraper in a background thread to prevent timeouts."""
+    thread = threading.Thread(target=run_scraper)
+    thread.start()
+
 @app.route("/api/scheduled_update", methods=["GET"])
 def scheduled_update():
-    run_scraper()
-    return jsonify({"message": "Course data updated successfully"}), 200
+    run_scraper_async()  # Run scraper in the background
+    return jsonify({"message": "Scraping started in background"}), 202
 
 if __name__ == "__main__":
     app.run(debug=True)
