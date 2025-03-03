@@ -585,13 +585,7 @@ def generate():
     combination_count = len(filtered_combinations)
     return render_template_string(result_template, calendars=calendars, combination_count=combination_count, online_sections=online_sections)
 
-@app.route("/")
-def home():
-    return "Flask is running on Vercel!"
-
-# This is required for Vercel
-def handler(event, context):
-    return app
+handler = app
 
 if __name__ == "__main__":
     app.run(debug=True)
