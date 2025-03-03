@@ -1,0 +1,51 @@
+# Python Bytecode and Virtual Environments
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+env/
+*.egg-info/
+*.egg
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Virtualenv
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs and Debugging Files
+*.log
+*.out
+*.err
+debug.log
+
+# Cache Files
+.cache/
+*.sqlite3
+*.db
+instance/
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# Vercel Specific
+.vercel/
+.vercelignore
+output.log
+
+# Ignore cached data
+cache_*.json
+
+# Ignore Python and OS-specific files
+.DS_Store
+Thumbs.db
+
+# Ignore Jupyter Notebook checkpoints (if used)
+.ipynb_checkpoints/
+.vercel
