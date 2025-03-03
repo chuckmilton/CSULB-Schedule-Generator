@@ -1,5 +1,5 @@
 import itertools
-import time_test
+import utils.time_test as time_test
 
 def provide_combinations():
     courses = {}
