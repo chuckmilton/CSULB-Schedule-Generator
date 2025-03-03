@@ -28,7 +28,7 @@ def get_current_semester():
     else:
         return f"Spring_{year}"
 
-CURRENT_SEMESTER = get_current_semester()  # or set a fixed value for testing
+CURRENT_SEMESTER = 'Fall_2021'  # For testing purposes; you can also use get_current_semester()
 
 def load_cached_courses(semester, cache_age_limit=6 * 3600):
     cache_file = os.path.join("/tmp", f"cache_{semester}.json")
@@ -37,13 +37,18 @@ def load_cached_courses(semester, cache_age_limit=6 * 3600):
         if age < cache_age_limit:
             with open(cache_file, "r", encoding="utf-8") as f:
                 try:
-                    return json.load(f)
+                    data = json.load(f)
+                    return data, os.path.getmtime(cache_file)
                 except Exception:
-                    return None
-    return None
+                    return None, None
+    return None, None
 
-def save_courses_to_cache(semester, data):
+def save_courses_to_cache(semester, courses):
     cache_file = os.path.join("/tmp", f"cache_{semester}.json")
+    data = {
+        "last_updated": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"),
+        "courses": courses
+    }
     with open(cache_file, "w", encoding="utf-8") as f:
         json.dump(data, f)
 
@@ -78,7 +83,6 @@ def format_combination_as_calendar(combination):
             start_time = None
         if sec[0] not in color_map:
             color_map[sec[0]] = color_classes[len(color_map) % len(color_classes)]
-        # For in-person sections, display the actual time.
         event = {
             "course": sec[0],
             "section_type": sec[4],
@@ -112,10 +116,6 @@ def format_combination_as_calendar(combination):
     return html
 
 def event_overlaps_exclude_range(event_time, exclude_range):
-    """
-    Checks if event_time (e.g. "05:30PM-06:45PM") overlaps with exclude_range (e.g. "05:00PM-06:00PM").
-    Returns True if they overlap.
-    """
     try:
         ev_start, ev_end = event_time.split('-')
         ex_start, ex_end = exclude_range.split('-')
@@ -128,10 +128,6 @@ def event_overlaps_exclude_range(event_time, exclude_range):
         return False
 
 def event_overlaps_custom(event_time, custom_start, custom_end):
-    """
-    Checks if event_time (in "%I:%M%p" format, e.g. "05:30PM-06:45PM") overlaps with a custom time range,
-    where custom_start and custom_end are in 24-hour format ("HH:MM").
-    """
     try:
         ev_start, ev_end = event_time.split('-')
         ev_start_dt = datetime.strptime(ev_start.strip(), "%I:%M%p")
@@ -143,28 +139,10 @@ def event_overlaps_custom(event_time, custom_start, custom_end):
         return False
 
 # ------------------------------
-# SSE Endpoint: scrape_courses (for progress bar)
+# Frontend Templates
 # ------------------------------
-@app.route("/scrape_courses", methods=["GET"])
-def scrape_courses():
-    def generate():
-        subject_codes = scraper.subject_codes  # subject_codes defined globally in scraper.py
-        total = len(subject_codes)
-        all_course_data = []
-        for i, subject_code in enumerate(subject_codes, start=1):
-            data = scraper.courses(CURRENT_SEMESTER, subject_code)
-            all_course_data.extend(data)
-            progress = int((i / total) * 100)
-            yield f"data: {progress}\n\n"
-        save_courses_to_cache(CURRENT_SEMESTER, all_course_data)
-        yield "data: done\n\n"
-    response = app.response_class(generate(), mimetype="text/event-stream")
-    response.headers["Cache-Control"] = "no-cache"
-    return response
 
-# ------------------------------
-# Form Template (with AJAX, progress bar, filter inputs, and persistent settings)
-# ------------------------------
+# Form Template: Loads cached course data (updated externally) and includes a "Refresh Data" button.
 form_template = """
 <!DOCTYPE html>
 <html lang="en">
@@ -175,38 +153,25 @@ form_template = """
   <link href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
   <style>
-    .progress-container {
-      width: 100%;
-      background-color: #e5e7eb;
-      border-radius: 0.375rem;
-      overflow: hidden;
-    }
-    .progress-bar {
-      height: 1rem;
-      background-color: #3b82f6;
-      width: 0%;
-      text-align: center;
-      color: white;
-      line-height: 1rem;
-      font-size: 0.75rem;
-    }
     .custom-slot { margin-bottom: 0.5rem; }
     .delete-slot { background-color: #ef4444; color: white; border: none; padding: 0.25rem 0.5rem; border-radius: 0.25rem; cursor: pointer; }
   </style>
 </head>
 <body class="bg-gray-100">
-  <!-- Progress Bar (only shown when re-scraping is needed) -->
-  <!-- Progress Bar Overlay -->
-  <div id="progressWrapper" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gray-800 bg-opacity-80 hidden">
-    <div class="w-1/2">
-      <div id="progressContainer" class="progress-container">
-        <div id="progressBar" class="progress-bar">0%</div>
-      </div>
-      <div class="mt-2 text-white">Retrieving class data...</div>
-    </div>
-  </div>
   <div class="max-w-xl mx-auto p-6 mt-10 bg-white rounded-lg shadow-lg">
     <p class="text-center mb-4">Semester: <span class="font-semibold">{{ semester.replace('_', ' ') }}</span></p>
+    <!-- Display last updated time if available -->
+    {% if last_updated %}
+      <p class="text-center text-sm text-gray-600 mb-4">
+        Data last updated: {{ last_updated | datetimeformat }}
+      </p>
+    {% endif %}
+    <!-- Refresh Button -->
+    <div class="text-center mb-4">
+      <a href="{{ url_for('index') }}" class="inline-block bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+        Refresh Data
+      </a>
+    </div>
     <form id="courseForm" action="{{ url_for('generate') }}" method="post">
       <div class="mb-4">
         <label for="courses" class="block text-gray-700 font-medium mb-2">Select Courses:</label>
@@ -244,7 +209,7 @@ form_template = """
           {% endfor %}
         </select>
       </div>
-      <!-- Custom Filter: Multiple Custom Day & Time Slots -->
+      <!-- Custom Filters -->
       <div id="customSlots">
         <label class="block text-gray-700 font-medium mb-2">Exclude Specific Day & Time:</label>
         {% if exclude_custom %}
@@ -282,7 +247,7 @@ form_template = """
         Generate Schedule
       </button>
     </form>
-    <p class="text-center text-xs text-gray-400 mt-4">Course data updates per usage.</p>
+    <p class="text-center text-xs text-gray-400 mt-4">Course data updates every 3 hours.</p>
   </div>
   
   <script>
@@ -291,7 +256,7 @@ form_template = """
     let ts3 = new TomSelect("#exclude_times", { maxItems: null, plugins: ['remove_button'] });
     let ts4 = new TomSelect("#exclude_days", { maxItems: null, plugins: ['remove_button'] });
     
-    // Function to add another custom slot row with a delete button.
+    // Add new custom slot row.
     document.getElementById("addSlot").addEventListener("click", function() {
       let container = document.getElementById("customSlots");
       let newSlot = document.createElement("div");
@@ -313,52 +278,18 @@ form_template = """
       container.appendChild(newSlot);
     });
     
-    // Delegate click event for delete buttons in custom slots.
+    // Delete a custom slot row.
     document.getElementById("customSlots").addEventListener("click", function(e) {
       if (e.target && e.target.classList.contains("delete-slot")) {
         e.target.parentElement.remove();
       }
-    });
-    
-    // Use the pageshow event to hide the progress bar when returning via back button.
-    window.addEventListener("pageshow", function(event) {
-      if (performance.getEntriesByType("navigation")[0].type === "back_forward") {
-          document.getElementById("progressWrapper").classList.add("hidden");
-      }
-    });
-    
-    // On initial DOMContentLoaded, trigger SSE only if the courses select is empty.
-    window.addEventListener("DOMContentLoaded", function() {
-      let selectElem = document.getElementById("courses");
-      if (selectElem.options.length === 0) {
-        let evtSource = new EventSource("{{ url_for('scrape_courses') }}");
-        document.getElementById("progressWrapper").classList.remove("hidden");
-        evtSource.onmessage = function(e) {
-          if (e.data === "done") {
-            evtSource.close();
-            document.getElementById("progressWrapper").classList.add("hidden");
-            window.location.reload();
-          } else {
-            let progress = e.data;
-            let progressBar = document.getElementById("progressBar");
-            progressBar.style.width = progress + "%";
-            progressBar.innerText = progress + "%";
-          }
-        };
-      }
-    });
-    
-    document.getElementById("courseForm").addEventListener("submit", function() {
-      document.getElementById("progressWrapper").classList.remove("hidden");
     });
   </script>
 </body>
 </html>
 """
 
-# ------------------------------
-# Results Template (with combination numbering, count, and online section display)
-# ------------------------------
+# Results Template (unchanged)
 result_template = """
 <!DOCTYPE html>
 <html lang="en">
@@ -407,17 +338,32 @@ result_template = """
 </html>
 """
 
+@app.template_filter('datetimeformat')
+def datetimeformat(value):
+    if isinstance(value, str):
+        return value
+    return datetime.utcfromtimestamp(value).strftime("%Y-%m-%d %H:%M:%S UTC")
+
 @app.route("/", methods=["GET"])
 def index():
-    all_course_data = load_cached_courses(CURRENT_SEMESTER)
-    if not all_course_data:
-        all_course_data = []
-    distinct_courses = sorted({ (course[0], course[1]) for course in all_course_data })
-    all_profs = {course[8].strip() for course in all_course_data if course[8].strip()}
-    time_ranges = ["08:00AM-09:00AM", "09:00AM-10:00AM", "10:00AM-11:00AM", "11:00AM-12:00PM",
-                   "12:00PM-01:00PM", "01:00PM-02:00PM", "02:00PM-03:00PM", "03:00PM-04:00PM",
-                   "04:00PM-05:00PM", "05:00PM-06:00PM", "06:00PM-07:00PM"]
-    # Retrieve saved settings from session or default to empty lists.
+    data, _ = load_cached_courses(CURRENT_SEMESTER)
+    if data is None:
+        data = {"courses": []}
+        last_updated = None
+    elif isinstance(data, list):
+        # Fallback if data is a list.
+        last_updated = None
+        data = {"courses": data}
+    else:
+        last_updated = data.get("last_updated", None)
+    courses = data.get("courses", [])
+    distinct_courses = sorted({ (course[0], course[1]) for course in courses })
+    all_profs = { course[8].strip() for course in courses if course[8].strip() }
+    time_ranges = [
+        "08:00AM-09:00AM", "09:00AM-10:00AM", "10:00AM-11:00AM", "11:00AM-12:00PM",
+        "12:00PM-01:00PM", "01:00PM-02:00PM", "02:00PM-03:00PM", "03:00PM-04:00PM",
+        "04:00PM-05:00PM", "05:00PM-06:00PM", "06:00PM-07:00PM"
+    ]
     selected = session.get("selected_courses", [])
     exclude_professors = session.get("exclude_professors", [])
     exclude_times = session.get("exclude_times", [])
@@ -426,7 +372,8 @@ def index():
     return render_template_string(form_template, semester=CURRENT_SEMESTER, courses=distinct_courses,
                                   selected_courses=selected, professors=sorted(all_profs),
                                   time_ranges=time_ranges, exclude_professors=exclude_professors,
-                                  exclude_times=exclude_times, exclude_days=exclude_days, exclude_custom=exclude_custom)
+                                  exclude_times=exclude_times, exclude_days=exclude_days, 
+                                  exclude_custom=exclude_custom, last_updated=last_updated)
 
 @app.route("/generate", methods=["POST"])
 def generate():
@@ -451,57 +398,49 @@ def generate():
             exclude_custom.append((day.strip(), start.strip(), end.strip()))
     session["exclude_custom"] = exclude_custom
 
-    all_course_data = load_cached_courses(CURRENT_SEMESTER)
-    if not all_course_data:
-        all_course_data = scraper.fetch_and_store_courses(CURRENT_SEMESTER)
-        if not all_course_data:
+    data, _ = load_cached_courses(CURRENT_SEMESTER)
+    if data is None:
+        courses_data = scraper.fetch_and_store_courses(CURRENT_SEMESTER)
+        if not courses_data:
             return "No course data available."
-        save_courses_to_cache(CURRENT_SEMESTER, all_course_data)
+        save_courses_to_cache(CURRENT_SEMESTER, courses_data)
+        data = {"courses": courses_data}
+    else:
+        data = data.get("courses", [])
     
-    # Separate online sections and in-person sections.
     online_sections = {}
     inperson_courses_by_code = {}
-    for course in all_course_data:
+    for course in data:
         code = course[0]
-        # Use index 6 for the time field and index 10 for the comment field.
-        time_field = course[6].strip().lower()  # Normalize for comparison.
+        time_field = course[6].strip().lower()
         comment_field = course[10].strip().lower()
         if code in selected_courses:
-            # If the time field is empty or "na" AND the comment field indicates online class,
-            # (we check for "online-no meet times", "no-meet times", or "online no meet times")
-            if course[9] == "Seats Available" and (time_field in ["", "na"]) and ("online-no meet times" in comment_field or "no-meet times" in comment_field or "online no meet times" in comment_field):
-                # If the section type is empty, assign "Online"
+            if course[9] == "Seats Available" and (time_field in ["", "na"]) and (
+                "online-no meet times" in comment_field or 
+                "no-meet times" in comment_field or 
+                "online no meet times" in comment_field):
                 if not course[4].strip():
                     course[4] = "Online"
                 online_sections.setdefault(code, []).append(course)
-            # Otherwise, if seats are available and there is a time, treat as in-person.
             elif course[9] == "Seats Available" and time_field not in ["", "na"]:
                 inperson_courses_by_code.setdefault(code, {}).setdefault(course[4], []).append(course)
     
-    # Do not move online sections to in-person grouping if the course is online-only.
-    # (We want to display online classes separately.)
-    
-    # Check that every selected course has at least one available section.
     for code in selected_courses:
         if code not in inperson_courses_by_code and code not in online_sections:
             return render_template_string(result_template,
                 calendars=[f"<div class='text-center text-red-600'>No available sections for {code}.</div>"],
                 combination_count=0)
     
-    # Build required types for in-person combination generation (only using in-person sections).
     required_types_by_code = {}
     for code in inperson_courses_by_code:
         for sec in sum(inperson_courses_by_code.get(code, {}).values(), []):
             required_types_by_code.setdefault(code, set()).add(sec[4])
     
-    # Only generate in-person combinations for courses that have in-person sections.
-    courses_for_combinations = {code: secs for code, secs in inperson_courses_by_code.items() if secs}
+    courses_for_combinations = { code: secs for code, secs in inperson_courses_by_code.items() if secs }
     
-    # If no courses have in-person sections, then display only the online sections.
     if not courses_for_combinations:
         return render_template_string(result_template, calendars=[], combination_count=0, online_sections=online_sections)
     
-    # Ensure that for each selected course in in-person grouping, we have at least one section for every required type.
     for code in courses_for_combinations:
         required = required_types_by_code.get(code, set())
         available = set(courses_for_combinations.get(code, {}).keys())
@@ -510,7 +449,6 @@ def generate():
                 calendars=[f"<div class='text-center text-red-600'>No valid in-person sections available for {code} (missing required types).</div>"],
                 combination_count=0)
     
-    # Generate combinations for in-person sections.
     course_combinations = {}
     for code in courses_for_combinations:
         types = sorted(required_types_by_code.get(code, []))
@@ -530,7 +468,6 @@ def generate():
             for j in range(i+1, n):
                 sec1 = schedule_sections[i]
                 sec2 = schedule_sections[j]
-                # Skip conflict checking for online sections.
                 sec1_time = sec1[6].strip().lower()
                 sec2_time = sec2[6].strip().lower()
                 if ("na" in sec1_time or sec1_time == "" or
@@ -544,7 +481,6 @@ def generate():
         if not conflict:
             valid_combinations.append(schedule_sections)
     
-    # Apply additional filters.
     filtered_combinations = []
     for comb in valid_combinations:
         skip = False
@@ -593,12 +529,9 @@ from urllib.parse import urlparse
 class WSGIAdapter(BaseHTTPRequestHandler):
     def do_GET(self):
         self.wsgi_handle()
-
     def do_POST(self):
         self.wsgi_handle()
-
     def wsgi_handle(self):
-        # Build a minimal WSGI environment.
         environ = {}
         environ['REQUEST_METHOD'] = self.command
         parsed_url = urlparse(self.path)
@@ -612,40 +545,27 @@ class WSGIAdapter(BaseHTTPRequestHandler):
         environ['wsgi.multithread'] = False
         environ['wsgi.multiprocess'] = False
         environ['wsgi.run_once'] = False
-
-        # Add required key:
         environ['wsgi.url_scheme'] = 'http'
-
-        # Pass along content headers.
         length = self.headers.get('Content-Length')
         if length:
             environ['CONTENT_LENGTH'] = length
         environ['CONTENT_TYPE'] = self.headers.get('Content-Type', '')
-
         response_status = None
         response_headers = None
-
         def start_response(status, headers, exc_info=None):
             nonlocal response_status, response_headers
             response_status = status
             response_headers = headers
             return lambda x: None
-
-        # Call your Flask app.
         result = app(environ, start_response)
         response_body = b"".join(result)
-
-        # Send response status and headers.
         self.send_response(int(response_status.split()[0]))
         for header, value in response_headers:
             self.send_header(header, value)
         self.end_headers()
         self.wfile.write(response_body)
 
-# === Export the Adapter as the Handler ===
 handler = WSGIAdapter
-
 
 if __name__ == "__main__":
     app.run(debug=True)
-
