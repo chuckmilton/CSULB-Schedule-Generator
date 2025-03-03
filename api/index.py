@@ -154,7 +154,6 @@ def scrape_courses():
         for i, subject_code in enumerate(subject_codes, start=1):
             data = scraper.courses(CURRENT_SEMESTER, subject_code)
             all_course_data.extend(data)
-            print(data)
             progress = int((i / total) * 100)
             yield f"data: {progress}\n\n"
         save_courses_to_cache(CURRENT_SEMESTER, all_course_data)
@@ -197,7 +196,8 @@ form_template = """
 </head>
 <body class="bg-gray-100">
   <!-- Progress Bar (only shown when re-scraping is needed) -->
-  <div id="progressWrapper" class="fixed inset-0 flex flex-col items-center justify-center bg-gray-800 bg-opacity-50 hidden">
+  <!-- Progress Bar Overlay -->
+  <div id="progressWrapper" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gray-800 bg-opacity-80 hidden">
     <div class="w-1/2">
       <div id="progressContainer" class="progress-container">
         <div id="progressBar" class="progress-bar">0%</div>
