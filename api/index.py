@@ -7,9 +7,8 @@ import itertools
 import sys
 
 # Instead of importing scraper and scheduled_update, we import our Supabase client from our dedicated module.
-# (Create a file supabase_client.py that initializes and exports your Supabase client.)
 from supabase_client import supabase
-from utils import time_test  # Keep this if you use it for conflict checking
+from utils import time_test
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY")

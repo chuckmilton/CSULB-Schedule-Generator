@@ -15,7 +15,6 @@ subject_codes = ['ACCT', 'AFRS', 'ASLD', 'AIS', 'AMST', 'ANTH', "ARAB", "ART", "
                      "STAT", "SDHE", "SRL", "SxI", "SCM", "THEA", "TRST", "UNIV", "UHP", "UDCP", "VIET", "WGSS"]
 
 def courses(semester, subject_code):
-    # Define the URL of the web page you want to scrape
     url = f'http://web.csulb.edu/depts/enrollment/registration/class_schedule/{semester}/By_Subject/{subject_code}.html'
 
     # Send an HTTP GET request to the URL
