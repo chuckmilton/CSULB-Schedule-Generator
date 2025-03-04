@@ -6,10 +6,10 @@ from datetime import date, datetime
 import itertools
 import sys
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from scraper import scraper
-from utils import time_test
-from api.scheduled_update import run_scraper, supabase  # Using Supabase client from scheduled_update
+# Instead of importing scraper and scheduled_update, we import our Supabase client from our dedicated module.
+# (Create a file supabase_client.py that initializes and exports your Supabase client.)
+from supabase_client import supabase
+from utils import time_test  # Keep this if you use it for conflict checking
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY")
@@ -72,8 +72,6 @@ def fetch_courses_from_supabase():
         ])
     return courses
 
-
-
 def format_combination_as_calendar(combination):
     """
     Given a valid schedule combination (a list of course sections),
@@ -95,7 +93,7 @@ def format_combination_as_calendar(combination):
     ]
     color_map = {}
     for sec in combination:
-        days_str = sec[5].strip()  # e.g., "Monday Wednesday"
+        days_str = sec[5].strip()
         day_list = days_str.split()
         time_str = sec[6]
         try:
@@ -164,7 +162,6 @@ def event_overlaps_custom(event_time, custom_start, custom_end):
 # Frontend Templates
 # ------------------------------
 
-# Form Template – note that the "Refresh Data" button has been removed.
 form_template = """
 <!DOCTYPE html>
 <html lang="en">
@@ -199,7 +196,6 @@ form_template = """
         </select>
         <p class="text-sm text-gray-500 mt-1">Type to search. Use Ctrl (or Command on Mac) to select multiple.</p>
       </div>
-      <!-- Predefined Filters -->
       <div class="mb-4">
         <label for="exclude_professors" class="block text-gray-700 font-medium mb-2">Exclude Professors:</label>
         <select id="exclude_professors" name="exclude_professors" multiple class="w-full p-2 border border-gray-300 rounded">
@@ -224,8 +220,7 @@ form_template = """
           {% endfor %}
         </select>
       </div>
-      <!-- Custom Filters -->
-      <div id="customSlots">
+      <div id="customSlots" class="mb-4">
         <label class="block text-gray-700 font-medium mb-2">Exclude Specific Day & Time:</label>
         {% if exclude_custom %}
           {% for custom in exclude_custom %}
@@ -358,11 +353,8 @@ def datetimeformat(value):
 
 @app.route("/", methods=["GET"])
 def index():
-    # Always fetch courses directly from Supabase
     courses = fetch_courses_from_supabase()
-    # As we are no longer caching locally, we have no "last_updated" timestamp.
     last_updated = None
-
     distinct_courses = sorted({ (course[0], course[1]) for course in courses })
     selected = session.get("selected_courses", [])
     if selected:
@@ -375,7 +367,6 @@ def index():
         "04:00PM-05:00PM", "05:00PM-06:00PM", "06:00PM-07:00PM", "07:00PM-08:00PM",
         "08:00PM-09:00PM", "09:00PM-10:00PM", "10:00PM-11:00PM"
     ]
-    selected = session.get("selected_courses", [])
     exclude_professors = session.get("exclude_professors", [])
     exclude_times = session.get("exclude_times", [])
     exclude_days = session.get("exclude_days", [])
@@ -383,23 +374,19 @@ def index():
     return render_template_string(form_template, semester=CURRENT_SEMESTER, courses=distinct_courses,
                                   selected_courses=selected, professors=sorted(all_profs),
                                   time_ranges=time_ranges, exclude_professors=exclude_professors,
-                                  exclude_times=exclude_times, exclude_days=exclude_days, 
+                                  exclude_times=exclude_times, exclude_days=exclude_days,
                                   exclude_custom=exclude_custom, last_updated=last_updated)
 
 @app.route("/generate", methods=["POST"])
 def generate():
     selected_courses = request.form.getlist("courses")
     session["selected_courses"] = selected_courses
-
     exclude_professors = request.form.getlist("exclude_professors")
     session["exclude_professors"] = exclude_professors
-
     exclude_times = request.form.getlist("exclude_times")
     session["exclude_times"] = exclude_times
-
     exclude_days = request.form.getlist("exclude_days")
     session["exclude_days"] = exclude_days
-
     custom_days = request.form.getlist("exclude_custom_day[]")
     custom_starts = request.form.getlist("exclude_custom_start[]")
     custom_ends = request.form.getlist("exclude_custom_end[]")
@@ -571,11 +558,6 @@ class WSGIAdapter(BaseHTTPRequestHandler):
         self.wfile.write(response_body)
 
 handler = WSGIAdapter
-
-@app.route("/api/scheduled_update", methods=["GET"])
-def scheduled_update():
-    run_scraper()
-    return jsonify({"message": "Course data updated successfully"}), 200
 
 if __name__ == "__main__":
     app.run(debug=True)

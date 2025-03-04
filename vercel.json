@@ -1,22 +1,11 @@
 {
-    "version": 2,
-    "functions": {
-      "api/index.py": {
-        "runtime": "@vercel/python@4.7.1"
-      }
-    },
-    "crons": [
-      {
-        "path": "/api/scheduled_update",
-        "schedule": "0 5 * * *"
-      },
-      {
-        "path": "/api/scheduled_update",
-        "schedule": "0 15 * * *"
-      }
-  ],
-    "routes": [
-      { "src": "/(.*)", "dest": "api/index.py" }
-    ]
-  }
-  
+  "version": 2,
+  "functions": {
+    "api/index.py": {
+      "runtime": "@vercel/python@4.7.1"
+    }
+  },
+  "routes": [
+    { "src": "/(.*)", "dest": "api/index.py" }
+  ]
+}
