@@ -70,4 +70,4 @@ The Flask application is deployed to **Vercel** for easy access.
 ### AWS Lambda (Scheduled Web Scraping)
 To keep course data updated, we run a scheduled job using AWS Lambda:
 1. Package the `scheduled_update.py` as a Lambda function.
-2. Set up a **CloudWatch** scheduled trigger (e.g., every 3 hours).
+2. Set up a **CloudWatch** scheduled trigger (e.g., every 24 hours).
