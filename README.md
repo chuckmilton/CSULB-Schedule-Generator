@@ -1,31 +1,73 @@
-# CSULB Schedule Generator
-The CSULB Schedule Generator is a personal Python project that is designed to streamline the process of creating a personalized course schedule for your academic semester. It accomplishes this by scraping information from California State University, Long Beach's course catalog and then generating all possible combinations of schedules while ensuring that there are no time conflicts in between each course.
+# CSULB Course Schedule Generator
 
-The goal of this generator is to make schedule planning for CSULB easier, faster, and more accessible for students.
+## Overview
+The **CSULB Course Schedule Generator** is a Flask-based web application that helps students generate optimized course schedules based on their selected classes. The system fetches real-time course data from CSULB’s website using web scraping, stores the data in **Supabase**, and allows users to generate schedule combinations while applying filters such as professor exclusions, time constraints, and specific day preferences.
 
-## How It Works
-* The generator utilizes web scraping to fetch course information from CSULB's course catalog.
-* It parses HTML content from each webpage using BeautifulSoup to extract relevant data.
-* Every course's information (course code, title, units, class number, course type, days, times, location, instructor, etc.) is saved to a text file.
-* The data is also stored in a SQLite database for later use.
-* You can filter the course data by selecting certain courses you want to take.
-* After doing so, the generator interefaces with the "combo_generator" module to provide schedule combinations of available courses that avoid time conflicts.
+### Hosting & Infrastructure
+- **Frontend & Backend**: Flask (Hosted on **Vercel**)
+- **Database**: Supabase (PostgreSQL)
+- **Web Scraping & Data Updates**: AWS Lambda (Scheduled)
 
-## CSULB Schedule Generator vs. CSULB's Schedule Planner
-Pros:
-* CSULB Schedule Generator does not require student login, therefore easier access.
-* Less steps, therefore faster process.
-* According to other students, CSULB's Schedule Planner can sometimes have glitches.
+---
+## Features
+- **Real-Time Course Data**: Scrapes CSULB’s course schedule every few hours.
+- **Schedule Generation**: Optimizes schedules based on user preferences.
+- **Filters**:
+  - Exclude certain professors
+  - Exclude time slots or specific days
+  - Custom time constraints
+- **Responsive UI**: Mobile-friendly design using Tailwind CSS.
+- **Calendar Display**: Weekly view for in-person courses.
 
-Cons:
-* Must webscrape CSULB's course catalog while CSULB's Schedule Planner has direct access to the data.
-* CSULB's Schedule Planner is able to directly import the courses from your planned schedule into your enrollment shopping cart.
+---
+## Installation & Setup
+### Prerequisites
+Ensure you have the following installed:
+- Python 3.x
+- Pip
+- Virtual environment (optional, but recommended)
 
-## How to set up
-* pip install requests
-* pip install beautifulsoup4
+### Clone Repository
+```bash
+git clone https://github.com/chuckmilton/CSULB-Schedule-Generator.git
+cd CSULB-Schedule-Generator
+```
 
-### Disclaimer
-This project was created for educational/demonstrative purposes. 
-I have no affiliation with any of CSULB's sites and neither I nor the software will be held liable for any consequences resulting from its use. 
-I take no responsibility for what others do with the code and do not advise for insane scraping of websites.
+### Install Dependencies
+```bash
+pip install -r requirements.txt
+```
+
+### Environment Variables
+Create a `.env` file and add your Supabase credentials:
+```ini
+SUPABASE_URL=your_supabase_url
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+SECRET_KEY=your_flask_secret_key
+```
+
+### Running Locally
+```bash
+python index.py
+```
+
+Visit `http://127.0.0.1:5000/` in your browser.
+
+---
+## Deployment
+### Vercel (Frontend & Backend API)
+The Flask application is deployed to **Vercel** for easy access.
+
+1. Install Vercel CLI:
+   ```bash
+   npm install -g vercel
+   ```
+2. Deploy:
+   ```bash
+   vercel
+   ```
+
+### AWS Lambda (Scheduled Web Scraping)
+To keep course data updated, we run a scheduled job using AWS Lambda:
+1. Package the `scheduled_update.py` as a Lambda function.
+2. Set up a **CloudWatch** scheduled trigger (e.g., every 3 hours).
