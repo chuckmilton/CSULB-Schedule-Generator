@@ -42,12 +42,9 @@ def delete_old_semester_data():
         if response.data:
             latest_stored_semester = response.data[0]["semester"]
             if latest_stored_semester != CURRENT_SEMESTER:
-                print(f"Deleting old semester data: {latest_stored_semester}")
                 supabase.table("courses").delete().neq("semester", CURRENT_SEMESTER).execute()
-                print("Old semester data deleted successfully.")
     except Exception as e:
-        print("Error deleting old semester data:", e)
-
+        pass
 def save_courses_to_supabase(semester, data):
     """
     Inserts or updates courses in Supabase.
@@ -73,11 +70,9 @@ def save_courses_to_supabase(semester, data):
 
         # Insert or update data in Supabase
         response = supabase.table("courses").upsert(formatted_data).execute()
-        print("Courses successfully stored in Supabase:", response)
     
     except Exception as e:
-        print("Error saving to Supabase:", e)
-
+        pass
 def run_scraper():
     """
     Scrapes the course data and stores it in Supabase.
@@ -95,7 +90,6 @@ def run_scraper():
         save_courses_to_supabase(CURRENT_SEMESTER, all_course_data)
     
     except Exception as e:
-        print("Scraper encountered an error:", e)
-
+        pass
 if __name__ == "__main__":
     run_scraper()
