@@ -5,11 +5,11 @@ import time
 from datetime import date, datetime
 import itertools
 import sys
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from scraper import scraper
 from utils import time_test
-from api.scheduled_update import run_scraper
-import threading
+from api.scheduled_update import run_scraper, supabase  # Using Supabase client from scheduled_update
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY")
@@ -32,25 +32,47 @@ def get_current_semester():
 
 CURRENT_SEMESTER = get_current_semester()
 
-def load_cached_courses(semester):
-    cache_file = os.path.join("/tmp", f"cache_{semester}.json")
-    if os.path.exists(cache_file):
-        with open(cache_file, "r", encoding="utf-8") as f:
-            try:
-                data = json.load(f)
-                return data
-            except Exception:
-                return None
-    return None
+def fetch_courses_from_supabase():
+    """
+    Fetch courses for the CURRENT_SEMESTER from Supabase by paginating through results.
+    Converts each row to a list in the order:
+    [subject_code, course_name, units, section, section_type, days, time, location, professor, availability, notes].
+    """
+    batch_size = 1000
+    offset = 0
+    all_courses = []
+    while True:
+        result = supabase.table("courses")\
+                         .select("*", count="exact")\
+                         .eq("semester", CURRENT_SEMESTER)\
+                         .range(offset, offset + batch_size - 1)\
+                         .execute()
+        if result.data:
+            all_courses.extend(result.data)
+            # If we received fewer rows than the batch_size, we are done.
+            if len(result.data) < batch_size:
+                break
+            offset += batch_size
+        else:
+            break
+    courses = []
+    for course in all_courses:
+        courses.append([
+            course.get("subject_code", ""),
+            course.get("course_name", ""),
+            course.get("units", ""),
+            course.get("section", ""),
+            course.get("section_type", ""),
+            course.get("days", ""),
+            course.get("time", ""),
+            course.get("location", ""),
+            course.get("professor", ""),
+            course.get("availability", ""),
+            course.get("notes", "")
+        ])
+    return courses
 
-def save_courses_to_cache(semester, courses):
-    cache_file = os.path.join("/tmp", f"cache_{semester}.json")
-    data = {
-        "last_updated": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"),
-        "courses": courses
-    }
-    with open(cache_file, "w", encoding="utf-8") as f:
-        json.dump(data, f)
+
 
 def format_combination_as_calendar(combination):
     """
@@ -142,7 +164,7 @@ def event_overlaps_custom(event_time, custom_start, custom_end):
 # Frontend Templates
 # ------------------------------
 
-# Form Template: Loads cached course data (updated externally) and includes a "Refresh Data" button.
+# Form Template – note that the "Refresh Data" button has been removed.
 form_template = """
 <!DOCTYPE html>
 <html lang="en">
@@ -160,18 +182,11 @@ form_template = """
 <body class="bg-gray-100">
   <div class="max-w-xl mx-auto p-6 mt-10 bg-white rounded-lg shadow-lg">
     <p class="text-center mb-4">Semester: <span class="font-semibold">{{ semester.replace('_', ' ') }}</span></p>
-    <!-- Display last updated time if available -->
     {% if last_updated %}
       <p class="text-center text-sm text-gray-600 mb-4">
         Data last updated: {{ last_updated | datetimeformat }}
       </p>
     {% endif %}
-    <!-- Refresh Button -->
-    <div class="text-center mb-4">
-      <a href="{{ url_for('index') }}" class="inline-block bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
-        Refresh Data
-      </a>
-    </div>
     <form id="courseForm" action="{{ url_for('generate') }}" method="post">
       <div class="mb-4">
         <label for="courses" class="block text-gray-700 font-medium mb-2">Select Courses:</label>
@@ -256,7 +271,6 @@ form_template = """
     let ts3 = new TomSelect("#exclude_times", { maxItems: null, plugins: ['remove_button'] });
     let ts4 = new TomSelect("#exclude_days", { maxItems: null, plugins: ['remove_button'] });
     
-    // Add new custom slot row.
     document.getElementById("addSlot").addEventListener("click", function() {
       let container = document.getElementById("customSlots");
       let newSlot = document.createElement("div");
@@ -278,7 +292,6 @@ form_template = """
       container.appendChild(newSlot);
     });
     
-    // Delete a custom slot row.
     document.getElementById("customSlots").addEventListener("click", function(e) {
       if (e.target && e.target.classList.contains("delete-slot")) {
         e.target.parentElement.remove();
@@ -289,7 +302,6 @@ form_template = """
 </html>
 """
 
-# Results Template (unchanged)
 result_template = """
 <!DOCTYPE html>
 <html lang="en">
@@ -346,23 +358,22 @@ def datetimeformat(value):
 
 @app.route("/", methods=["GET"])
 def index():
-    data = load_cached_courses(CURRENT_SEMESTER)
-    if data is None:
-        data = {"courses": []}
-        last_updated = None
-    elif isinstance(data, list):
-        # Fallback if data is a list.
-        last_updated = None
-        data = {"courses": data}
-    else:
-        last_updated = data.get("last_updated", None)
-    courses = data.get("courses", [])
+    # Always fetch courses directly from Supabase
+    courses = fetch_courses_from_supabase()
+    # As we are no longer caching locally, we have no "last_updated" timestamp.
+    last_updated = None
+
     distinct_courses = sorted({ (course[0], course[1]) for course in courses })
-    all_profs = { course[8].strip() for course in courses if course[8].strip() }
+    selected = session.get("selected_courses", [])
+    if selected:
+        all_profs = { course[8].strip() for course in courses if course[0] in selected and course[8].strip() }
+    else:
+        all_profs = { course[8].strip() for course in courses if course[8].strip() }
     time_ranges = [
         "08:00AM-09:00AM", "09:00AM-10:00AM", "10:00AM-11:00AM", "11:00AM-12:00PM",
         "12:00PM-01:00PM", "01:00PM-02:00PM", "02:00PM-03:00PM", "03:00PM-04:00PM",
-        "04:00PM-05:00PM", "05:00PM-06:00PM", "06:00PM-07:00PM"
+        "04:00PM-05:00PM", "05:00PM-06:00PM", "06:00PM-07:00PM", "07:00PM-08:00PM",
+        "08:00PM-09:00PM", "09:00PM-10:00PM", "10:00PM-11:00PM"
     ]
     selected = session.get("selected_courses", [])
     exclude_professors = session.get("exclude_professors", [])
@@ -398,19 +409,13 @@ def generate():
             exclude_custom.append((day.strip(), start.strip(), end.strip()))
     session["exclude_custom"] = exclude_custom
 
-    data = load_cached_courses(CURRENT_SEMESTER)
-    if data is None:
-        courses_data = scraper.fetch_and_store_courses(CURRENT_SEMESTER)
-        if not courses_data:
-            return "No course data available."
-        save_courses_to_cache(CURRENT_SEMESTER, courses_data)
-        data = {"courses": courses_data}
-    else:
-        data = data.get("courses", [])
+    courses = fetch_courses_from_supabase()
+    if not courses:
+        return "No course data available."
     
     online_sections = {}
     inperson_courses_by_code = {}
-    for course in data:
+    for course in courses:
         code = course[0]
         time_field = course[6].strip().lower()
         comment_field = course[10].strip().lower()
@@ -567,15 +572,10 @@ class WSGIAdapter(BaseHTTPRequestHandler):
 
 handler = WSGIAdapter
 
-def run_scraper_async():
-    """Run scraper in a background thread to prevent timeouts."""
-    thread = threading.Thread(target=run_scraper)
-    thread.start()
-
 @app.route("/api/scheduled_update", methods=["GET"])
 def scheduled_update():
-    run_scraper_async()  # Run scraper in the background
-    return jsonify({"message": "Scraping started in background"}), 202
+    run_scraper()
+    return jsonify({"message": "Course data updated successfully"}), 200
 
 if __name__ == "__main__":
     app.run(debug=True)
