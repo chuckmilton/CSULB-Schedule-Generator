@@ -262,10 +262,10 @@ form_template = """
         </button>
       </div>
       <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded">
-        Generate Schedule
+        Generate Schedules
       </button>
     </form>
-    <p class="text-center text-xs text-gray-400 mt-4">Course data updates every 24 hours.</p>
+    <p class="text-center text-xs text-gray-400 mt-4">Course data updates every 24 hours during registration windows.</p>
   </div>
   
   <script>
