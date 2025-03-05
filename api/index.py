@@ -117,7 +117,6 @@ def format_combination_as_calendar(combination):
                 week[day].append(event)
     for day in week:
         week[day].sort(key=lambda e: e["start"] if e["start"] is not None else datetime.min)
-    # Responsive grid: one column on small screens, seven on medium+
     html = '<div class="grid grid-cols-1 md:grid-cols-7 gap-4">'
     for day in ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]:
         html += f'<div><div class="font-bold text-center border-b pb-2">{day}</div>'
@@ -157,6 +156,21 @@ def event_overlaps_custom(event_time, custom_start, custom_end):
         return ev_start_dt < cust_end_dt and cust_start_dt < ev_end_dt
     except Exception:
         return False
+
+def schedule_signature(combination):
+    """
+    Compute a signature (a tuple of (day, time) pairs) for a given schedule combination.
+    This signature is used to group schedules that have the same days and times.
+    """
+    sig = []
+    for sec in combination:
+        days = sec[5].split()
+        time_val = sec[6].strip()
+        for day in days:
+            if time_val.lower() not in ["", "na"]:
+                sig.append((day, time_val))
+    sig.sort()
+    return tuple(sig)
 
 # ------------------------------
 # Frontend Templates
@@ -338,16 +352,44 @@ result_template = """
         </ul>
       </div>
     {% endif %}
-    {% if calendars %}
-      <h2 class="text-xl font-semibold text-center mb-4">Total Available Combinations: {{ combination_count }}</h2>
-      {% for calendar in calendars %}
-        <div class="mb-8">
-          <h3 class="text-lg font-semibold mb-2">Combination {{ loop.index }}:</h3>
-          {{ calendar | safe }}
+    {% if groups %}
+      <h2 class="text-xl font-semibold text-center mb-4">
+        Total Valid Combinations: {{ total_count }} | Unique Schedule Patterns: {{ groups|length }}
+      </h2>
+      {% if total_count > 100 %}
+        <p class="text-center text-sm text-gray-500 mb-4">
+          Showing first 50 schedule patterns out of {{ total_count }} valid combinations.
+        </p>
+      {% endif %}
+      {% for sig, calendars in groups.items() %}
+        <div class="mb-6 border p-4 rounded">
+          <h3 class="font-bold mb-2">
+            Schedule Pattern {{ loop.index }}: ({{ calendars|length }} schedule{% if calendars|length > 1 %}s{% endif %})
+          </h3>
+          <!-- Day/Time Grid for the Pattern -->
+          <div class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
+            {% for day, time in sig %}
+              <div class="flex items-center">
+                <span class="w-24 font-semibold">{{ day }}:</span>
+                <span>{{ time }}</span>
+              </div>
+            {% endfor %}
+          </div>
+          <!-- List Each Calendar with a Label -->
+          {% for calendar in calendars %}
+            <div class="mt-4 border p-2">
+              <div class="font-semibold mb-2">Schedule {{ loop.index }}:</div>
+              <div>
+                {{ calendar | safe }}
+              </div>
+            </div>
+          {% endfor %}
         </div>
       {% endfor %}
     {% else %}
-      <div class="text-center text-red-600">No valid in-person schedules available for the selected classes.</div>
+      <div class="text-center text-red-600">
+        No valid in-person schedules available for the selected classes.
+      </div>
     {% endif %}
     <!-- Bottom Back Button -->
     <div class="mt-6 text-center">
@@ -435,8 +477,9 @@ def generate():
     for code in selected_courses:
         if code not in inperson_courses_by_code and code not in online_sections:
             return render_template_string(result_template,
-                calendars=[f"<div class='text-center text-red-600'>No available sections for {code}.<br>Note: If you can't find the course, it might not be available.</div>"],
-                combination_count=0)
+                groups={},
+                total_count=0,
+                online_sections=online_sections)
     
     required_types_by_code = {}
     for code in inperson_courses_by_code:
@@ -446,15 +489,16 @@ def generate():
     courses_for_combinations = { code: secs for code, secs in inperson_courses_by_code.items() if secs }
     
     if not courses_for_combinations:
-        return render_template_string(result_template, calendars=[], combination_count=0, online_sections=online_sections)
+        return render_template_string(result_template, groups={}, total_count=0, online_sections=online_sections)
     
     for code in courses_for_combinations:
         required = required_types_by_code.get(code, set())
         available = set(courses_for_combinations.get(code, {}).keys())
         if not required.issubset(available):
             return render_template_string(result_template,
-                calendars=[f"<div class='text-center text-red-600'>No valid in-person sections available for {code} (missing required types).</div>"],
-                combination_count=0)
+                groups={},
+                total_count=0,
+                online_sections=online_sections)
     
     course_combinations = {}
     for code in courses_for_combinations:
@@ -518,16 +562,31 @@ def generate():
     
     if not filtered_combinations:
         return render_template_string(result_template,
-            calendars=["<div class='text-center text-red-600'>No valid schedules available for the selected classes after applying filters.</div>"],
-            combination_count=0)
+            groups={},
+            total_count=0,
+            online_sections=online_sections)
     
-    calendars = []
+    # Deduplicate combinations
+    unique_combinations = []
+    seen = set()
     for comb in filtered_combinations:
-        cal_html = format_combination_as_calendar(comb)
-        calendars.append(cal_html)
+        # Create a canonical representation, e.g. using (course code, section) for each section
+        rep = tuple(sorted((sec[0], sec[3], sec[5].strip(), sec[6].strip()) for sec in comb))
+        if rep not in seen:
+            seen.add(rep)
+            unique_combinations.append(comb)
     
-    combination_count = len(filtered_combinations)
-    return render_template_string(result_template, calendars=calendars, combination_count=combination_count, online_sections=online_sections)
+    # Group schedules by their days and times
+    groups = {}
+    for comb in unique_combinations:
+        sig = schedule_signature(comb)
+        groups.setdefault(sig, []).append(format_combination_as_calendar(comb))
+
+    # Limit to only 50 schedule patterns
+    limited_groups = dict(list(groups.items())[:50])
+    
+    total_count = len(unique_combinations)
+    return render_template_string(result_template, groups=limited_groups, total_count=len(unique_combinations), online_sections=online_sections)
 
 from http.server import BaseHTTPRequestHandler
 from io import BytesIO
