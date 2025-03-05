@@ -15,6 +15,7 @@ subject_codes = ['ACCT', 'AFRS', 'ASLD', 'AIS', 'AMST', 'ANTH', "ARAB", "ART", "
                      "STAT", "SDHE", "SRL", "SxI", "SCM", "THEA", "TRST", "UNIV", "UHP", "UDCP", "VIET", "WGSS"]
 
 def courses(semester, subject_code):
+    # Define the URL of the web page you want to scrape
     url = f'http://web.csulb.edu/depts/enrollment/registration/class_schedule/{semester}/By_Subject/{subject_code}.html'
 
     # Send an HTTP GET request to the URL
@@ -48,6 +49,8 @@ def courses(semester, subject_code):
                         columns = row.find_all('td')
                         section_number = columns[0].text.strip()  # Extract section number
                         class_notes = columns[4].text.strip()  # Extract CLASS NOTES
+                        if not section_number:
+                            continue
 
                         # Check if "SEM" or "LAB" is present in the CLASS NOTES column
                         if "SEM" in class_notes:
@@ -122,10 +125,10 @@ def courses(semester, subject_code):
                         yellow_dot_img = row.find('img', alt='Reserve Capacity', title='Reserve Capacity')
                         seats_available = "Seats Available" if green_dot_img else "Reserve Capacity" if yellow_dot_img else "No Seats Available"
 
-                        # Append extracted data to course_data list
-                        course_data.append(
-                            (course_code, course_title, units, section_number, course_type, day, time, location,
-                             instructor, seats_available, comment))
+                        if seats_available == "Seats Available":
+                            course_data.append(
+                                (course_code, course_title, units, section_number, course_type, day, time, location,
+                                 instructor, seats_available, comment))
 
         return course_data
     else:

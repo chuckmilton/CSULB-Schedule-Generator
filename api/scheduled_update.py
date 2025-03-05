@@ -2,19 +2,17 @@ import os
 import json
 from datetime import date
 import sys
-from dotenv import load_dotenv
 from supabase import create_client, Client
 
+# Ensure the parent directory is in the path so we can import the scraper module.
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from scraper import scraper
 
-load_dotenv()
+# Load Supabase credentials from environment variables (set in Lambda configuration)
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
 
-# Load Supabase credentials from environment variables
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-
-# Initialize Supabase client with service role key
+# Initialize Supabase client with the service role key
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
 def get_current_semester():
@@ -32,22 +30,22 @@ def get_current_semester():
 
 CURRENT_SEMESTER = get_current_semester()
 
-def delete_old_semester_data():
+def clear_table():
     """
-    Deletes course data from the previous semester if it is different from the current semester.
+    Unconditionally deletes all records from the courses table.
+    Uses a filter on the id column (assumed to be > 0 for all valid rows)
+    to satisfy Supabase's requirement for a WHERE clause.
     """
     try:
-        # Fetch the most recent semester stored in the database
-        response = supabase.table("courses").select("semester").limit(1).execute()
-        if response.data:
-            latest_stored_semester = response.data[0]["semester"]
-            if latest_stored_semester != CURRENT_SEMESTER:
-                supabase.table("courses").delete().neq("semester", CURRENT_SEMESTER).execute()
+        supabase.table("courses").delete().filter("id", "gt", 0).execute()
+        print("Courses table cleared.")
     except Exception as e:
-        pass
+        print("Error clearing courses table:", e)
+
 def save_courses_to_supabase(semester, data):
     """
-    Inserts or updates courses in Supabase.
+    Inserts or updates courses in Supabase via upsert.
+    (Ensure your courses table has a unique constraint on the columns that uniquely identify a course.)
     """
     try:
         formatted_data = [
@@ -67,29 +65,24 @@ def save_courses_to_supabase(semester, data):
             }
             for course in data
         ]
-
-        # Insert or update data in Supabase
-        response = supabase.table("courses").upsert(formatted_data).execute()
-    
+        supabase.table("courses").upsert(formatted_data).execute()
     except Exception as e:
-        pass
+        print("Error saving courses to supabase:", e)
+
 def run_scraper():
     """
     Scrapes the course data and stores it in Supabase.
+    Always clears the courses table before adding new data.
     """
     all_course_data = []
     try:
-        # Delete old semester data if necessary
-        delete_old_semester_data()
-
         for subject_code in scraper.subject_codes:
             data = scraper.courses(CURRENT_SEMESTER, subject_code)
             all_course_data.extend(data)
-
-        # Save the scraped data to Supabase
+        clear_table()
         save_courses_to_supabase(CURRENT_SEMESTER, all_course_data)
-    
     except Exception as e:
-        pass
+        print("Error running scraper:", e)
+
 if __name__ == "__main__":
     run_scraper()

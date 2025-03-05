@@ -76,6 +76,7 @@ def format_combination_as_calendar(combination):
     Given a valid schedule combination (a list of course sections),
     return an HTML snippet that renders the schedule as a weekly calendar.
     Each section is added to all days it occurs on.
+    The grid is now responsive: one column on small screens, seven columns on medium+.
     """
     week = {
         "Sunday": [],
@@ -117,7 +118,8 @@ def format_combination_as_calendar(combination):
                 week[day].append(event)
     for day in week:
         week[day].sort(key=lambda e: e["start"] if e["start"] is not None else datetime.min)
-    html = '<div class="grid grid-cols-7 gap-4">'
+    # Responsive grid: one column on small screens, seven on medium+
+    html = '<div class="grid grid-cols-1 md:grid-cols-7 gap-4">'
     for day in ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]:
         html += f'<div><div class="font-bold text-center border-b pb-2">{day}</div>'
         if week[day]:
@@ -193,7 +195,12 @@ form_template = """
             </option>
           {% endfor %}
         </select>
-        <p class="text-sm text-gray-500 mt-1">Type to search. Use Ctrl (or Command on Mac) to select multiple.</p>
+        <p class="text-sm text-gray-500 mt-1">
+          Type to search. Use Ctrl (or Command on Mac) to select multiple.
+        </p>
+        <p class="text-xs text-gray-500 mt-1">
+          Note: If you cannot find your course, it may not be available (i.e. no seats available).
+        </p>
       </div>
       <div class="mb-4">
         <label for="exclude_professors" class="block text-gray-700 font-medium mb-2">Exclude Professors:</label>
@@ -202,6 +209,9 @@ form_template = """
             <option value="{{ prof }}" {% if prof in exclude_professors %}selected{% endif %}>{{ prof }}</option>
           {% endfor %}
         </select>
+        <p class="text-xs text-gray-500 mt-1">
+          Note: If you cannot find a professor here, it may be because no available courses are taught by them.
+        </p>
       </div>
       <div class="mb-4">
         <label for="exclude_times" class="block text-gray-700 font-medium mb-2">Exclude Time Ranges:</label>
@@ -309,13 +319,13 @@ result_template = """
     <h1 class="text-2xl font-bold text-center mb-6">Generated Course Schedules (Weekly Calendar)</h1>
     {% if online_sections %}
       <div class="mb-6 p-4 border border-green-500 rounded bg-green-50">
-        <h2 class="text-xl font-semibold text-center">Online Classes</h2>
+        <h2 class="text-xl font-semibold text-center">Online Classes (No Meeting Times)</h2>
         <ul>
           {% for code, sections in online_sections.items() %}
             <li class="mt-2">
               <strong>{{ code }}:</strong>
               {% for sec in sections %}
-                {{ sec[4] }} - Online ({{ sec[7] }}, {{ sec[8] }})
+                {{ sec[4] }} - {{ sec[8] }}
                 {% if not loop.last %}<br>{% endif %}
               {% endfor %}
             </li>
@@ -324,7 +334,7 @@ result_template = """
       </div>
     {% endif %}
     {% if calendars %}
-      <h2 class="text-xl font-semibold text-center mb-4">Total Valid In-Person Combinations: {{ combination_count }}</h2>
+      <h2 class="text-xl font-semibold text-center mb-4">Total Available Combinations: {{ combination_count }}</h2>
       {% for calendar in calendars %}
         <div class="mb-8">
           <h3 class="text-lg font-semibold mb-2">Combination {{ loop.index }}:</h3>
@@ -419,7 +429,7 @@ def generate():
     for code in selected_courses:
         if code not in inperson_courses_by_code and code not in online_sections:
             return render_template_string(result_template,
-                calendars=[f"<div class='text-center text-red-600'>No available sections for {code}.</div>"],
+                calendars=[f"<div class='text-center text-red-600'>No available sections for {code}.<br>Note: If you can't find the course, it might not be available.</div>"],
                 combination_count=0)
     
     required_types_by_code = {}
