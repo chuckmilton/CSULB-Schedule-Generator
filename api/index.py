@@ -358,7 +358,10 @@ result_template = """
       </h2>
       {% if total_count > 100 %}
         <p class="text-center text-sm text-gray-500 mb-4">
-          Showing first 50 schedule patterns out of {{ total_count }} valid combinations.
+          Showing first 20 schedule patterns out of {{ total_count }} valid combinations.
+        </p>
+        <p class="text-center text-sm text-gray-500 mb-4">
+          Use filters to narrow down the list of available course schedules and quickly find the options that best fit your needs.
         </p>
       {% endif %}
       {% for sig, calendars in groups.items() %}
@@ -582,8 +585,8 @@ def generate():
         sig = schedule_signature(comb)
         groups.setdefault(sig, []).append(format_combination_as_calendar(comb))
 
-    # Limit to only 50 schedule patterns
-    limited_groups = dict(list(groups.items())[:50])
+    # Limit to only 20 schedule patterns
+    limited_groups = dict(list(groups.items())[:20])
     
     total_count = len(unique_combinations)
     return render_template_string(result_template, groups=limited_groups, total_count=len(unique_combinations), online_sections=online_sections)
