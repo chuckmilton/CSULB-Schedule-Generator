@@ -48,7 +48,6 @@ def fetch_courses_from_supabase():
                          .execute()
         if result.data:
             all_courses.extend(result.data)
-            # If we received fewer rows than the batch_size, we are done.
             if len(result.data) < batch_size:
                 break
             offset += batch_size
@@ -316,6 +315,12 @@ result_template = """
 </head>
 <body class="bg-gray-100">
   <div class="max-w-5xl mx-auto p-6 mt-10 bg-white rounded-lg shadow-lg">
+    <!-- Top Back Button -->
+    <div class="mb-4">
+      <a href="{{ url_for('index') }}" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+        Back to Form
+      </a>
+    </div>
     <h1 class="text-2xl font-bold text-center mb-6">Generated Course Schedules (Weekly Calendar)</h1>
     {% if online_sections %}
       <div class="mb-6 p-4 border border-green-500 rounded bg-green-50">
@@ -344,6 +349,7 @@ result_template = """
     {% else %}
       <div class="text-center text-red-600">No valid in-person schedules available for the selected classes.</div>
     {% endif %}
+    <!-- Bottom Back Button -->
     <div class="mt-6 text-center">
       <a href="{{ url_for('index') }}" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
         Back
