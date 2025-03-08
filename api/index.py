@@ -5,13 +5,41 @@ import time
 from datetime import date, datetime
 import itertools
 import sys
-
+import math
 # Instead of importing scraper and scheduled_update, we import our Supabase client from our dedicated module.
 from supabase_client import supabase
 from utils import time_test
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY")
+
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['PERMANENT_SESSION_LIFETIME'] = 3600
+
+import hashlib  # For generating the cache key
+import redis    # For Redis cache
+
+# Initialize Redis client
+try:
+    redis_client = redis.Redis(host='localhost', port=6379, db=0)
+    redis_client.ping()  # Test the connection
+    print("Redis connection successful")
+except Exception as e:
+    print(f"Redis connection failed: {e}")
+    # Fallback to a simple in-memory cache if Redis is unavailable
+    class SimpleCache:
+        def __init__(self):
+            self.cache = {}
+        
+        def get(self, key):
+            return self.cache.get(key)
+        
+        def set(self, key, value, ex=None):
+            self.cache[key] = value
+            # ex parameter ignored for simplicity
+    
+    redis_client = SimpleCache()
+    print("Using in-memory cache instead")
 
 def get_current_semester():
     """
@@ -319,6 +347,7 @@ form_template = """
 </html>
 """
 
+# Updated result_template with cache_key in pagination URLs
 result_template = """
 <!DOCTYPE html>
 <html lang="en">
@@ -354,7 +383,11 @@ result_template = """
     {% endif %}
     {% if groups %}
       <h2 class="text-xl font-semibold text-center mb-4">
-        Total Valid Combinations: {{ total_count }} | Unique Schedule Patterns: {{ groups|length }}
+        Total Valid Combinations: {{ total_valid }} | Unique Schedules: {{ total_unique }} | 
+        Displayed Schedule Patterns: {{ groups|length }} | 
+        Total Schedules On This Page: {% set count = namespace(value=0) %}
+        {% for _, calendars in groups.items() %}{% set count.value = count.value + calendars|length %}{% endfor %}
+        {{ count.value }}
       </h2>
       {% if total_count > 100 %}
         <p class="text-center text-sm text-gray-500 mb-4">
@@ -389,6 +422,31 @@ result_template = """
           {% endfor %}
         </div>
       {% endfor %}
+      
+      {% if total_pages > 1 %}
+        <div class="flex justify-between items-center mt-8 mb-4">
+          {% if current_page > 1 %}
+            <a href="{{ url_for('generate') }}?page={{ current_page - 1 }}&key={{ cache_key }}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+              &larr; Previous
+            </a>
+          {% else %}
+            <span></span>
+          {% endif %}
+          
+          <span class="text-gray-700">
+            Page {{ current_page }} of {{ total_pages }}
+          </span>
+          
+          {% if current_page < total_pages %}
+            <a href="{{ url_for('generate') }}?page={{ current_page + 1 }}&key={{ cache_key }}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+              Next &rarr;
+            </a>
+          {% else %}
+            <span></span>
+          {% endif %}
+        </div>
+      {% endif %}
+      
     {% else %}
       <div class="text-center text-red-600">
         No valid in-person schedules available for the selected classes.
@@ -437,159 +495,288 @@ def index():
                                   exclude_times=exclude_times, exclude_days=exclude_days,
                                   exclude_custom=exclude_custom, last_updated=last_updated)
 
-@app.route("/generate", methods=["POST"])
+@app.route("/generate", methods=["GET", "POST"])
 def generate():
-    selected_courses = request.form.getlist("courses")
-    session["selected_courses"] = selected_courses
-    exclude_professors = request.form.getlist("exclude_professors")
-    session["exclude_professors"] = exclude_professors
-    exclude_times = request.form.getlist("exclude_times")
-    session["exclude_times"] = exclude_times
-    exclude_days = request.form.getlist("exclude_days")
-    session["exclude_days"] = exclude_days
-    custom_days = request.form.getlist("exclude_custom_day[]")
-    custom_starts = request.form.getlist("exclude_custom_start[]")
-    custom_ends = request.form.getlist("exclude_custom_end[]")
-    exclude_custom = []
-    for day, start, end in zip(custom_days, custom_starts, custom_ends):
-        if day and start and end:
-            exclude_custom.append((day.strip(), start.strip(), end.strip()))
-    session["exclude_custom"] = exclude_custom
+    print("Session data:", dict(session))
+    if request.method == "POST":
+        # Process form data
+        selected_courses = request.form.getlist("courses")
+        session["selected_courses"] = selected_courses
+        exclude_professors = request.form.getlist("exclude_professors")
+        session["exclude_professors"] = exclude_professors
+        exclude_times = request.form.getlist("exclude_times")
+        session["exclude_times"] = exclude_times
+        exclude_days = request.form.getlist("exclude_days")
+        session["exclude_days"] = exclude_days
+        custom_days = request.form.getlist("exclude_custom_day[]")
+        custom_starts = request.form.getlist("exclude_custom_start[]")
+        custom_ends = request.form.getlist("exclude_custom_end[]")
+        exclude_custom = []
+        for day, start, end in zip(custom_days, custom_starts, custom_ends):
+            if day and start and end:
+                exclude_custom.append((day.strip(), start.strip(), end.strip()))
+        session["exclude_custom"] = exclude_custom
+        
+        # Store the cache key in the session
+        cache_data = {
+            "selected_courses": selected_courses,
+            "exclude_professors": exclude_professors,
+            "exclude_times": exclude_times,
+            "exclude_days": exclude_days,
+            "exclude_custom": exclude_custom,
+        }
+        cache_key = "schedule:" + hashlib.md5(json.dumps(cache_data, sort_keys=True).encode('utf-8')).hexdigest()
+        session["cache_key"] = cache_key
+    else:
+        # For GET requests (pagination), try to get the key from URL first, then session
+        url_cache_key = request.args.get("key")
+        session_cache_key = session.get("cache_key")
+        
+        cache_key = url_cache_key or session_cache_key
+        
+        if not cache_key:
+            print("No cache key found in URL or session for pagination!")
+            return redirect(url_for('index'))
+        
+        # Store it back in session in case it came from URL
+        if url_cache_key:
+            session["cache_key"] = url_cache_key
+        
+        # Retrieve filter settings from session
+        selected_courses = session.get("selected_courses", [])
+        exclude_professors = session.get("exclude_professors", [])
+        exclude_times = session.get("exclude_times", [])
+        exclude_days = session.get("exclude_days", [])
+        exclude_custom = session.get("exclude_custom", [])
 
+    # Fetch course data
     courses = fetch_courses_from_supabase()
     if not courses:
         return "No course data available."
     
-    online_sections = {}
-    inperson_courses_by_code = {}
-    for course in courses:
-        code = course[0]
-        time_field = course[6].strip().lower()
-        comment_field = course[10].strip().lower()
-        if code in selected_courses:
-            if course[9] == "Seats Available" and (time_field in ["", "na"]) and (
-                "online-no meet times" in comment_field or 
-                "no-meet times" in comment_field or 
-                "online no meet times" in comment_field):
-                if not course[4].strip():
-                    course[4] = "Online"
-                online_sections.setdefault(code, []).append(course)
-            elif course[9] == "Seats Available" and time_field not in ["", "na"]:
-                inperson_courses_by_code.setdefault(code, {}).setdefault(course[4], []).append(course)
-    
-    for code in selected_courses:
-        if code not in inperson_courses_by_code and code not in online_sections:
-            return render_template_string(result_template,
-                groups={},
-                total_count=0,
-                online_sections=online_sections)
-    
-    required_types_by_code = {}
-    for code in inperson_courses_by_code:
-        for sec in sum(inperson_courses_by_code.get(code, {}).values(), []):
-            required_types_by_code.setdefault(code, set()).add(sec[4])
-    
-    courses_for_combinations = { code: secs for code, secs in inperson_courses_by_code.items() if secs }
-    
-    if not courses_for_combinations:
-        return render_template_string(result_template, groups={}, total_count=0, online_sections=online_sections)
-    
-    for code in courses_for_combinations:
-        required = required_types_by_code.get(code, set())
-        available = set(courses_for_combinations.get(code, {}).keys())
-        if not required.issubset(available):
-            return render_template_string(result_template,
-                groups={},
-                total_count=0,
-                online_sections=online_sections)
-    
-    course_combinations = {}
-    for code in courses_for_combinations:
-        types = sorted(required_types_by_code.get(code, []))
-        sections_lists = [courses_for_combinations[code][t] for t in types]
-        course_combinations[code] = list(itertools.product(*sections_lists))
-    
-    overall_combinations = list(itertools.product(*[course_combinations[code] for code in courses_for_combinations]))
-    
-    valid_combinations = []
-    for overall in overall_combinations:
-        schedule_sections = []
-        for sections_tuple in overall:
-            schedule_sections.extend(sections_tuple)
-        conflict = False
-        n = len(schedule_sections)
-        for i in range(n):
-            for j in range(i+1, n):
-                sec1 = schedule_sections[i]
-                sec2 = schedule_sections[j]
-                sec1_time = sec1[6].strip().lower()
-                sec2_time = sec2[6].strip().lower()
-                if ("na" in sec1_time or sec1_time == "" or
-                    "na" in sec2_time or sec2_time == ""):
-                    continue
-                if time_test.are_time_windows_in_conflict(sec1[5], sec1[6], sec2[5], sec2[6]):
-                    conflict = True
-                    break
-            if conflict:
-                break
-        if not conflict:
-            valid_combinations.append(schedule_sections)
-    
-    filtered_combinations = []
-    for comb in valid_combinations:
-        skip = False
-        for sec in comb:
-            prof = sec[8].strip()
-            if prof in exclude_professors:
-                skip = True
-                break
-            for ex_time in exclude_times:
-                if event_overlaps_exclude_range(sec[6], ex_time):
-                    skip = True
-                    break
-            if skip:
-                break
-            event_days = sec[5].split()
-            if any(day in event_days for day in exclude_days):
-                skip = True
-                break
-            for custom in exclude_custom:
-                custom_day, cust_start, cust_end = custom
-                if custom_day in sec[5].split() and event_overlaps_custom(sec[6], cust_start, cust_end):
-                    skip = True
-                    break
-            if skip:
-                break
-        if not skip:
-            filtered_combinations.append(comb)
-    
-    if not filtered_combinations:
-        return render_template_string(result_template,
-            groups={},
-            total_count=0,
-            online_sections=online_sections)
-    
-    # Deduplicate combinations
-    unique_combinations = []
-    seen = set()
-    for comb in filtered_combinations:
-        # Create a canonical representation, e.g. using (course code, section) for each section
-        rep = tuple(sorted((sec[0], sec[3], sec[5].strip(), sec[6].strip()) for sec in comb))
-        if rep not in seen:
-            seen.add(rep)
-            unique_combinations.append(comb)
-    
-    # Group schedules by their days and times
-    groups = {}
-    for comb in unique_combinations:
-        sig = schedule_signature(comb)
-        groups.setdefault(sig, []).append(format_combination_as_calendar(comb))
+    # Check Redis for cached data using the cache_key
+    # Update the Redis cached data retrieval section:
 
-    # Limit to only 20 schedule patterns
-    limited_groups = dict(list(groups.items())[:20])
+    # Check Redis for cached data using the cache_key
+    cached = redis_client.get(cache_key)
+    if cached:
+        try:
+            print(f"Cache hit for key: {cache_key}")
+            # Redis returns binary data - decode it first
+            if isinstance(cached, bytes):
+                cached = cached.decode('utf-8')
+            cached_data = json.loads(cached)
+            
+            # Convert the group_items correctly from serializable format
+            group_items_serializable = cached_data["group_items"]
+            group_items = []
+            for sig_list, calendars in group_items_serializable:
+                tuple_sig = tuple(tuple(item) if isinstance(item, list) else item for item in sig_list)
+                group_items.append((tuple_sig, calendars))
+            
+            total_valid = cached_data["total_valid"]
+            total_unique = cached_data["total_unique"]
+            online_sections = cached_data.get("online_sections", {})
+            
+            print(f"Retrieved from cache: {len(group_items)} groups")
+        except Exception as e:
+            print(f"Error processing cached data: {e}")
+            # Fall through to regenerate the data
+            cached = None
+            
+    if not cached:
+        print(f"Cache miss for key: {cache_key}")
+        # Rest of your cache miss code...
+        
+        # Process course data to identify online sections and in-person courses
+        online_sections = {}
+        inperson_courses_by_code = {}
+        for course in courses:
+            code = course[0]
+            time_field = course[6].strip().lower()
+            comment_field = course[10].strip().lower()
+            if code in selected_courses:
+                if course[9] == "Seats Available" and (time_field in ["", "na"]) and (
+                    "online-no meet times" in comment_field or 
+                    "no-meet times" in comment_field or 
+                    "online no meet times" in comment_field):
+                    if not course[4].strip():
+                        course[4] = "Online"
+                    online_sections.setdefault(code, []).append(course)
+                elif course[9] == "Seats Available" and time_field not in ["", "na"]:
+                    inperson_courses_by_code.setdefault(code, {}).setdefault(course[4], []).append(course)
+        
+        # Check if all selected courses have available sections
+        for code in selected_courses:
+            if code not in inperson_courses_by_code and code not in online_sections:
+                return render_template_string(result_template,
+                    groups={},
+                    total_count=0,
+                    total_valid=0,
+                    total_unique=0,
+                    online_sections=online_sections,
+                    current_page=1,
+                    total_pages=1)
+        
+        # Identify required section types for each course
+        required_types_by_code = {}
+        for code in inperson_courses_by_code:
+            for sec in sum(inperson_courses_by_code.get(code, {}).values(), []):
+                required_types_by_code.setdefault(code, set()).add(sec[4])
+        
+        # Filter to only include courses with available sections
+        courses_for_combinations = {code: secs for code, secs in inperson_courses_by_code.items() if secs}
+        
+        # Check if there are any in-person courses
+        if not courses_for_combinations:
+            return render_template_string(result_template, 
+                                         groups={}, 
+                                         total_count=0,
+                                         total_valid=0,
+                                         total_unique=0, 
+                                         online_sections=online_sections,
+                                         current_page=1, 
+                                         total_pages=1)
+        
+        # Check if all required section types are available
+        for code in courses_for_combinations:
+            required = required_types_by_code.get(code, set())
+            available = set(courses_for_combinations.get(code, {}).keys())
+            if not required.issubset(available):
+                return render_template_string(result_template,
+                    groups={},
+                    total_count=0,
+                    total_valid=0,
+                    total_unique=0,
+                    online_sections=online_sections,
+                    current_page=1,
+                    total_pages=1)
+        
+        # Generate combinations of sections for each course
+        course_combinations = {}
+        for code in courses_for_combinations:
+            types = sorted(required_types_by_code.get(code, []))
+            sections_lists = [courses_for_combinations[code][t] for t in types]
+            course_combinations[code] = list(itertools.product(*sections_lists))
+        
+        # Generate all possible schedule combinations
+        overall_combinations = list(itertools.product(*[course_combinations[code] for code in courses_for_combinations]))
+        
+        # Find valid combinations (no time conflicts)
+        valid_combinations = []
+        for overall in overall_combinations:
+            schedule_sections = []
+            for sections_tuple in overall:
+                schedule_sections.extend(sections_tuple)
+            conflict = False
+            n = len(schedule_sections)
+            for i in range(n):
+                for j in range(i+1, n):
+                    sec1 = schedule_sections[i]
+                    sec2 = schedule_sections[j]
+                    sec1_time = sec1[6].strip().lower()
+                    sec2_time = sec2[6].strip().lower()
+                    if ("na" in sec1_time or sec1_time == "" or
+                        "na" in sec2_time or sec2_time == ""):
+                        continue
+                    if time_test.are_time_windows_in_conflict(sec1[5], sec1[6], sec2[5], sec2[6]):
+                        conflict = True
+                        break
+                if conflict:
+                    break
+            if not conflict:
+                valid_combinations.append(schedule_sections)
+        
+        # Apply user filters
+        filtered_combinations = []
+        for comb in valid_combinations:
+            skip = False
+            for sec in comb:
+                prof = sec[8].strip()
+                if prof in exclude_professors:
+                    skip = True
+                    break
+                for ex_time in exclude_times:
+                    if event_overlaps_exclude_range(sec[6], ex_time):
+                        skip = True
+                        break
+                if skip:
+                    break
+                event_days = sec[5].split()
+                if any(day in event_days for day in exclude_days):
+                    skip = True
+                    break
+                for custom in exclude_custom:
+                    custom_day, cust_start, cust_end = custom
+                    if custom_day in sec[5].split() and event_overlaps_custom(sec[6], cust_start, cust_end):
+                        skip = True
+                        break
+                if skip:
+                    break
+            if not skip:
+                filtered_combinations.append(comb)
+        
+        # Track total number of valid combinations
+        total_valid = len(filtered_combinations)
+        
+        # Deduplicate combinations
+        unique_combinations = []
+        seen = set()
+        for comb in filtered_combinations:
+            # Create a canonical representation
+            rep = tuple(sorted((sec[0], sec[3], sec[5].strip(), sec[6].strip()) for sec in comb))
+            if rep not in seen:
+                seen.add(rep)
+                unique_combinations.append(comb)
+        
+        total_unique = len(unique_combinations)
+        
+        # Group schedules by their days and times
+        groups = {}
+        for comb in unique_combinations:
+            sig = schedule_signature(comb)
+            cal = format_combination_as_calendar(comb)
+            groups.setdefault(sig, []).append(cal)
+        
+        # Deduplicate calendars within each group
+        for sig in groups:
+            groups[sig] = list(dict.fromkeys(groups[sig]))
+        
+        # Sort groups by signature
+        group_items = sorted(groups.items(), key=lambda x: x[0])
+        
+        # Convert to serializable format for caching
+        group_items_serializable = [(list(sig), calendars) for sig, calendars in group_items]
+        cache_value = {
+            "group_items": group_items_serializable,
+            "total_valid": total_valid,
+            "total_unique": total_unique,
+            "online_sections": online_sections
+        }
+        redis_client.set(cache_key, json.dumps(cache_value), ex=3600)
+
+    # Pagination
+    page_size = 20
+    page = int(request.args.get("page", 1))
+    total_pages = math.ceil(len(group_items) / page_size) if group_items else 1
     
-    total_count = len(unique_combinations)
-    return render_template_string(result_template, groups=limited_groups, total_count=len(unique_combinations), online_sections=online_sections)
+    if page < 1:
+        page = 1
+    elif page > total_pages:
+        page = total_pages
+    
+    start_index = (page - 1) * page_size
+    end_index = start_index + page_size
+    
+    # Create a dictionary from the sliced group_items
+    paginated_groups = dict(group_items[start_index:end_index])
+    
+    print(f"Rendering page {page} of {total_pages} with {len(paginated_groups)} groups")
+    
+    return render_template_string(result_template, groups=paginated_groups, total_count=total_unique,
+                                 total_valid=total_valid, total_unique=total_unique,
+                                 online_sections=online_sections, current_page=page, 
+                                 total_pages=total_pages, cache_key=cache_key)
 
 from http.server import BaseHTTPRequestHandler
 from io import BytesIO
