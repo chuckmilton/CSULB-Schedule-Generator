@@ -6,6 +6,7 @@ from datetime import date, datetime
 import itertools
 import sys
 import math
+import requests
 # Instead of importing scraper and scheduled_update, we import our Supabase client from our dedicated module.
 from supabase_client import supabase
 from utils import time_test
@@ -40,6 +41,14 @@ except Exception as e:
     
     redis_client = SimpleCache()
     print("Using in-memory cache instead")
+  
+try:
+    with open("nameMappings.json", "r") as f:
+        name_mappings = json.load(f)
+    print("Loaded nameMappings.json successfully")
+except Exception as e:
+    print("Error loading nameMappings.json:", e)
+    name_mappings = {}
 
 def get_current_semester():
     """
@@ -98,12 +107,81 @@ def fetch_courses_from_supabase():
         ])
     return courses
 
+def clean_professor_name(name):
+    """Remove extraneous text and periods from initials."""
+    import re
+    clean_name = re.sub(r'(To be Announced|TBA)', '', name, flags=re.IGNORECASE)
+    clean_name = re.sub(r'\b([A-Z])\.', r'\1', clean_name)
+    return " ".join(clean_name.split())
+
+def fetch_professor_details(professor_name):
+    """
+    Query the RateMyProfessors GraphQL endpoint for details of a given professor.
+    Uses CSULB’s legacy school ID.
+    Caches the result in Redis for 24 hours.
+    Only returns the rating and the profile link.
+    Uses nameMappings.json to map short names to full names.
+    """
+    if not professor_name:
+        return None
+    # Check if the professor name exists in name_mappings; if so, use the mapped full name.
+    mapped_name = name_mappings.get(professor_name, professor_name)
+    clean_name = clean_professor_name(mapped_name)
+    cache_key = "rmp:" + hashlib.md5(clean_name.lower().encode('utf-8')).hexdigest()
+    cached = redis_client.get(cache_key)
+    if cached:
+        try:
+            return json.loads(cached)
+        except Exception:
+            pass
+    CSULB_SCHOOL_ID = "U2Nob29sLTE4ODQ2"  # CSULB legacyId
+    query = {
+        "query": f"""
+        query {{
+          newSearch {{
+            teachers(query: {{ text: "{clean_name}", schoolID: "{CSULB_SCHOOL_ID}" }}) {{
+              edges {{
+                node {{
+                  firstName
+                  lastName
+                  avgRating
+                  legacyId
+                }}
+              }}
+            }}
+          }}
+        }}
+        """
+    }
+    proxy_url = "https://www.ratemyprofessors.com/graphql"
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Authorization": "Basic dGVzdDp0ZXN0",  # Example token; adjust as needed
+        "User-Agent": "Mozilla/5.0"
+    }
+    try:
+        response = requests.post(proxy_url, json=query, headers=headers)
+        data = response.json()
+        edges = data.get("data", {}).get("newSearch", {}).get("teachers", {}).get("edges", [])
+        if not edges:
+            return None
+        # Take the first matching professor
+        professor = edges[0]["node"]
+        details = {
+            "rating": professor.get("avgRating", "N/A"),
+            "profileLink": f"https://www.ratemyprofessors.com/professor/{professor.get('legacyId')}"
+        }
+        redis_client.set(cache_key, json.dumps(details), ex=86400)
+        return details
+    except Exception as e:
+        print(f"Error fetching RMP details for {professor_name}: {e}")
+        return None
+
 def format_combination_as_calendar(combination):
     """
-    Given a valid schedule combination (a list of course sections),
-    return an HTML snippet that renders the schedule as a weekly calendar.
-    Each section is added to all days it occurs on.
-    The grid is now responsive: one column on small screens, seven columns on medium+.
+    Render a weekly calendar for a schedule combination.
+    For each course section, fetch RateMyProfessors details and display the rating as a clickable hyperlink.
     """
     week = {
         "Sunday": [],
@@ -130,16 +208,23 @@ def format_combination_as_calendar(combination):
             start_time = None
         if sec[0] not in color_map:
             color_map[sec[0]] = color_classes[len(color_map) % len(color_classes)]
+        professor = sec[8].strip()
         event = {
             "course": sec[0],
             "section_type": sec[4],
             "units": sec[2],
             "time": sec[6],
             "location": sec[7],
-            "professor": sec[8],
+            "professor": professor,
             "start": start_time,
             "color": color_map[sec[0]]
         }
+        rating_info = fetch_professor_details(professor)
+        if rating_info:
+            # Create a hyperlink for the rating
+            event["rmp"] = f'<a href="{rating_info.get("profileLink", "#")}" target="_blank">Rating: {rating_info.get("rating", "N/A")} / 5</a>'
+        else:
+            event["rmp"] = ""
         for day in day_list:
             if day in week:
                 week[day].append(event)
@@ -155,6 +240,8 @@ def format_combination_as_calendar(combination):
                 html += f'<div>{event["time"]}</div>'
                 html += f'<div>{event["location"]}</div>'
                 html += f'<div>{event["professor"]}</div>'
+                if event["rmp"]:
+                    html += f'<div class="text-xs text-gray-600">{event["rmp"]}</div>'
                 html += '</div>'
         else:
             html += '<div class="text-center text-gray-500 text-xs mt-2">—</div>'
@@ -586,8 +673,6 @@ def generate():
             
     if not cached:
         print(f"Cache miss for key: {cache_key}")
-        # Rest of your cache miss code...
-        
         # Process course data to identify online sections and in-person courses
         online_sections = {}
         inperson_courses_by_code = {}
