@@ -556,7 +556,7 @@ def datetimeformat(value):
         return value
     return datetime.utcfromtimestamp(value).strftime("%Y-%m-%d %H:%M:%S UTC")
 
-@app.route("/", methods=["GET"])
+@app.route("/", methods=["GET", "POST"])
 def index():
     courses = fetch_courses_from_supabase()
     last_updated = None
