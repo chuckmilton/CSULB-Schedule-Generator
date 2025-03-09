@@ -66,3 +66,6 @@ The **CSULB Course Schedule Generator** is a Flask-based web application that he
 ### 📅 **Schedule Filtering**  
 - The system filters out schedules with overlapping time slots.  
 - Custom filtering options allow for complex time and professor exclusions.  
+
+### **Disclaimer**
+**This website is an independent project and is not affiliated with or endorsed by California State University, Long Beach (CSULB).** The use of CSULB's colors and thematic elements is solely for stylistic purposes.
