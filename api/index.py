@@ -298,6 +298,8 @@ form_template = """
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CSULB Schedule Generator</title>
+  <!-- Add this right after the title tag in both templates -->
+  <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PCEtLSBCYWNrZ3JvdW5kIC0tPjxyZWN0IHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgcng9IjEyIiBmaWxsPSIjMDAyMDVCIi8+PCEtLSBDYWxlbmRhciBib2R5IC0tPjxyZWN0IHg9IjEyIiB5PSIxOCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjM0IiByeD0iNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRkZEMjAwIiBzdHJva2Utd2lkdGg9IjIiLz48IS0tIENhbGVuZGFyIGhlYWRlciBsaW5lIC0tPjxsaW5lIHgxPSIxMiIgeTE9IjI2IiB4Mj0iNTIiIHkyPSIyNiIgc3Ryb2tlPSIjRkZEMjAwIiBzdHJva2Utd2lkdGg9IjIiLz48IS0tIENhbGVuZGFyIGRhdGUgZG90cyAtLT48Y2lyY2xlIGN4PSIyMCIgY3k9IjM0IiByPSIyIiBmaWxsPSIjRkZEMjAwIi8+PGNpcmNsZSBjeD0iMzIiIGN5PSIzNCIgcj0iMiIgZmlsbD0iI0ZGRDIwMCIvPjxjaXJjbGUgY3g9IjQ0IiBjeT0iMzQiIHI9IjIiIGZpbGw9IiNGRkQyMDAiLz48Y2lyY2xlIGN4PSIyMCIgY3k9IjQ0IiByPSIyIiBmaWxsPSIjRkZEMjAwIi8+PGNpcmNsZSBjeD0iMzIiIGN5PSI0NCIgcj0iMiIgZmlsbD0iI0ZGRDIwMCIvPjxjaXJjbGUgY3g9IjQ0IiBjeT0iNDQiIHI9IjIiIGZpbGw9IiNGRkQyMDAiLz48L3N2Zz4=" type="image/svg+xml">
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
@@ -707,6 +709,8 @@ result_template = """
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CSULB Schedule Results</title>
+  <!-- Add this right after the title tag in both templates -->
+  <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PCEtLSBCYWNrZ3JvdW5kIC0tPjxyZWN0IHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgcng9IjEyIiBmaWxsPSIjMDAyMDVCIi8+PCEtLSBDYWxlbmRhciBib2R5IC0tPjxyZWN0IHg9IjEyIiB5PSIxOCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjM0IiByeD0iNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRkZEMjAwIiBzdHJva2Utd2lkdGg9IjIiLz48IS0tIENhbGVuZGFyIGhlYWRlciBsaW5lIC0tPjxsaW5lIHgxPSIxMiIgeTE9IjI2IiB4Mj0iNTIiIHkyPSIyNiIgc3Ryb2tlPSIjRkZEMjAwIiBzdHJva2Utd2lkdGg9IjIiLz48IS0tIENhbGVuZGFyIGRhdGUgZG90cyAtLT48Y2lyY2xlIGN4PSIyMCIgY3k9IjM0IiByPSIyIiBmaWxsPSIjRkZEMjAwIi8+PGNpcmNsZSBjeD0iMzIiIGN5PSIzNCIgcj0iMiIgZmlsbD0iI0ZGRDIwMCIvPjxjaXJjbGUgY3g9IjQ0IiBjeT0iMzQiIHI9IjIiIGZpbGw9IiNGRkQyMDAiLz48Y2lyY2xlIGN4PSIyMCIgY3k9IjQ0IiByPSIyIiBmaWxsPSIjRkZEMjAwIi8+PGNpcmNsZSBjeD0iMzIiIGN5PSI0NCIgcj0iMiIgZmlsbD0iI0ZGRDIwMCIvPjxjaXJjbGUgY3g9IjQ0IiBjeT0iNDQiIHI9IjIiIGZpbGw9IiNGRkQyMDAiLz48L3N2Zz4=" type="image/svg+xml">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
   <style>
