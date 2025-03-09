@@ -296,119 +296,355 @@ form_template = """
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Course Schedule Generator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CSULB Schedule Generator</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
   <style>
-    .custom-slot { margin-bottom: 0.5rem; }
-    .delete-slot { background-color: #ef4444; color: white; border: none; padding: 0.25rem 0.5rem; border-radius: 0.25rem; cursor: pointer; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #e4e9f2 100%);
+      min-height: 100vh;
+    }
+    
+    .page-container {
+      animation: fadeIn 0.8s ease-in-out;
+    }
+    
+    .form-container {
+      box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      border-radius: 12px;
+      background: white;
+      overflow: hidden;
+    }
+    
+    .form-container:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 15px 30px rgba(0,0,0,0.1);
+    }
+    
+    .header-section {
+      background: linear-gradient(to right, #3b82f6, #60a5fa);
+      padding: 1.5rem;
+      color: white;
+      border-radius: 12px 12px 0 0;
+    }
+    
+    .form-content {
+      padding: 2rem;
+    }
+    
+    .form-label {
+      color: #334155;
+      font-weight: 500;
+      margin-bottom: 0.5rem;
+      display: block;
+    }
+    
+    .select-container {
+      margin-bottom: 1.5rem;
+    }
+    
+    .form-hint {
+      color: #64748b;
+      font-size: 0.85rem;
+      margin-top: 0.5rem;
+    }
+    
+    .small-hint {
+      color: #94a3b8;
+      font-size: 0.75rem;
+      margin-top: 0.25rem;
+    }
+    
+    .custom-slot {
+      margin-bottom: 0.75rem;
+      animation: fadeInLeft 0.3s ease-in-out;
+    }
+    
+    .delete-slot {
+      background-color: #ef4444;
+      color: white;
+      border: none;
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.25rem;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+    
+    .delete-slot:hover {
+      background-color: #dc2626;
+    }
+    
+    .add-slot-button {
+      background-color: #e2e8f0;
+      transition: all 0.2s ease;
+    }
+    
+    .add-slot-button:hover {
+      background-color: #cbd5e1;
+    }
+    
+    .submit-button {
+      background: linear-gradient(to right, #2563eb, #3b82f6);
+      transition: all 0.3s ease;
+      font-weight: 500;
+      letter-spacing: 0.025em;
+    }
+    
+    .submit-button:hover {
+      background: linear-gradient(to right, #1d4ed8, #2563eb);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+    }
+    
+    /* Tom Select custom styling */
+    .ts-control {
+      border-radius: 0.375rem !important;
+      border-color: #e2e8f0 !important;
+      padding: 0.5rem !important;
+      box-shadow: none !important;
+    }
+    
+    .ts-control:focus {
+      border-color: #60a5fa !important;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2) !important;
+    }
+    
+    .ts-dropdown {
+      border-radius: 0.375rem !important;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+      overflow: hidden;
+      position: static;
+    }
+    
+    .ts-dropdown .active {
+      background-color: #dbeafe !important;
+      color: #1e40af !important;
+    }
+    
+    .ts-dropdown .option:hover {
+      background-color: #f1f5f9 !important;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    @keyframes fadeInLeft {
+      from {
+        opacity: 0;
+        transform: translateX(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+    
+    .footer {
+      text-align: center;
+      font-size: 0.75rem;
+      color: #94a3b8;
+      margin-top: 2rem;
+      padding: 0.5rem;
+    }
+    
+    .loading {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(255, 255, 255, 0.8);
+      z-index: 9999;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+    }
+    
+    .loading-spinner {
+      border: 5px solid #f3f3f3;
+      border-top: 5px solid #3b82f6;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+      margin-bottom: 1rem;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
   </style>
 </head>
-<body class="bg-gray-100">
-  <div class="max-w-xl mx-auto p-6 mt-10 bg-white rounded-lg shadow-lg">
-    <p class="text-center mb-4">Semester: <span class="font-semibold">{{ semester.replace('_', ' ') }}</span></p>
-    {% if last_updated %}
-      <p class="text-center text-sm text-gray-600 mb-4">
-        Data last updated: {{ last_updated | datetimeformat }}
-      </p>
-    {% endif %}
-    <form id="courseForm" action="{{ url_for('generate') }}" method="post">
-      <div class="mb-4">
-        <label for="courses" class="block text-gray-700 font-medium mb-2">Select Courses:</label>
-        <select id="courses" name="courses" multiple class="w-full p-2 border border-gray-300 rounded">
-          {% for code, title in courses %}
-            <option value="{{ code }}" {% if code in selected_courses %}selected{% endif %}>
-              {{ code }} - {{ title }}
-            </option>
-          {% endfor %}
-        </select>
-        <p class="text-sm text-gray-500 mt-1">
-          Type to search. Use Ctrl (or Command on Mac) to select multiple.
-        </p>
-        <p class="text-xs text-gray-500 mt-1">
-          Note: If you cannot find your course, it may not be available (i.e. no seats available).
-        </p>
+<body>
+  <div class="page-container py-10 px-4">
+    <div class="max-w-2xl mx-auto">
+      <div class="form-container">
+        <div class="header-section">
+          <h1 class="text-xl md:text-2xl font-bold text-center">CSULB Course Schedule Generator</h1>
+          <p class="text-center text-blue-100 mt-2">Semester: <span class="font-semibold">{{ semester.replace('_', ' ') }}</span></p>
+          {% if last_updated %}
+            <p class="text-center text-blue-100 text-sm mt-1">
+              Last updated: {{ last_updated | datetimeformat }}
+            </p>
+          {% endif %}
+        </div>
+        
+        <div class="form-content">
+          <form id="courseForm" action="{{ url_for('generate') }}" method="post">
+            <div class="select-container">
+              <label for="courses" class="form-label">Select Courses</label>
+              <select id="courses" name="courses" multiple class="w-full border border-gray-200 rounded-md">
+                {% for code, title in courses %}
+                  <option value="{{ code }}" {% if code in selected_courses %}selected{% endif %}>
+                    {{ code }} - {{ title }}
+                  </option>
+                {% endfor %}
+              </select>
+              <p class="form-hint">
+                Type to search. Use Ctrl (or Command on Mac) to select multiple.
+              </p>
+              <p class="small-hint">
+                Note: If you cannot find your course, it may not be available (i.e. no seats available).
+              </p>
+            </div>
+            
+            <div class="select-container">
+              <label for="exclude_professors" class="form-label">Exclude Professors</label>
+              <select id="exclude_professors" name="exclude_professors" multiple class="w-full border border-gray-200 rounded-md">
+                {% for prof in professors %}
+                  <option value="{{ prof }}" {% if prof in exclude_professors %}selected{% endif %}>{{ prof }}</option>
+                {% endfor %}
+              </select>
+              <p class="small-hint">
+                Note: If you cannot find a professor here, it may be because no available courses are taught by them.
+              </p>
+            </div>
+            
+            <div class="select-container">
+              <label for="exclude_times" class="form-label">Exclude Time Ranges</label>
+              <select id="exclude_times" name="exclude_times" multiple class="w-full border border-gray-200 rounded-md">
+                {% for time_range in time_ranges %}
+                  <option value="{{ time_range }}" {% if time_range in exclude_times %}selected{% endif %}>{{ time_range }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            
+            <div class="select-container">
+              <label for="exclude_days" class="form-label">Exclude Days</label>
+              <select id="exclude_days" name="exclude_days" multiple class="w-full border border-gray-200 rounded-md">
+                {% for day in ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] %}
+                  <option value="{{ day }}" {% if day in exclude_days %}selected{% endif %}>{{ day }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            
+            <div class="select-container">
+              <label class="form-label">Exclude Specific Day & Time</label>
+              <div id="customSlots">
+                {% if exclude_custom %}
+                  {% for custom in exclude_custom %}
+                  <div class="custom-slot flex space-x-2">
+                    <select name="exclude_custom_day[]" class="w-1/3 p-2 border border-gray-200 rounded-md">
+                      {% for day in ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] %}
+                        <option value="{{ day }}" {% if day == custom[0] %}selected{% endif %}>{{ day }}</option>
+                      {% endfor %}
+                    </select>
+                    <input type="time" name="exclude_custom_start[]" class="w-1/3 p-2 border border-gray-200 rounded-md" value="{{ custom[1] }}">
+                    <input type="time" name="exclude_custom_end[]" class="w-1/3 p-2 border border-gray-200 rounded-md" value="{{ custom[2] }}">
+                    <button type="button" class="delete-slot">Delete</button>
+                  </div>
+                  {% endfor %}
+                {% else %}
+                  <div class="custom-slot flex space-x-2">
+                    <select name="exclude_custom_day[]" class="w-1/3 p-2 border border-gray-200 rounded-md">
+                      {% for day in ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] %}
+                        <option value="{{ day }}">{{ day }}</option>
+                      {% endfor %}
+                    </select>
+                    <input type="time" name="exclude_custom_start[]" class="w-1/3 p-2 border border-gray-200 rounded-md">
+                    <input type="time" name="exclude_custom_end[]" class="w-1/3 p-2 border border-gray-200 rounded-md">
+                    <button type="button" class="delete-slot">Delete</button>
+                  </div>
+                {% endif %}
+              </div>
+              <div class="mt-2">
+                <button type="button" id="addSlot" class="add-slot-button w-full font-medium py-2 rounded flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 3a1 1 0 00-1 1v5H4a1 1 0 100 2h5v5a1 1 0 102 0v-5h5a1 1 0 100-2h-5V4a1 1 0 00-1-1z" clip-rule="evenodd" />
+                  </svg>
+                  Add Another Time Slot
+                </button>
+              </div>
+            </div>
+            
+            <button type="submit" id="submitBtn" class="submit-button w-full text-white py-3 px-4 rounded-md mt-6 flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 001.414 1.414L9 9.414V13a1 1 0 102 0V9.414l1.293 1.293a1 1 0 001.414-1.414z" clip-rule="evenodd" />
+              </svg>
+              Generate Schedules
+            </button>
+          </form>
+        </div>
       </div>
-      <div class="mb-4">
-        <label for="exclude_professors" class="block text-gray-700 font-medium mb-2">Exclude Professors:</label>
-        <select id="exclude_professors" name="exclude_professors" multiple class="w-full p-2 border border-gray-300 rounded">
-          {% for prof in professors %}
-            <option value="{{ prof }}" {% if prof in exclude_professors %}selected{% endif %}>{{ prof }}</option>
-          {% endfor %}
-        </select>
-        <p class="text-xs text-gray-500 mt-1">
-          Note: If you cannot find a professor here, it may be because no available courses are taught by them.
-        </p>
+      
+      <div class="footer">
+        <p>Course data updates every 24 hours during registration windows.</p>
       </div>
-      <div class="mb-4">
-        <label for="exclude_times" class="block text-gray-700 font-medium mb-2">Exclude Time Ranges:</label>
-        <select id="exclude_times" name="exclude_times" multiple class="w-full p-2 border border-gray-300 rounded">
-          {% for time_range in time_ranges %}
-            <option value="{{ time_range }}" {% if time_range in exclude_times %}selected{% endif %}>{{ time_range }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="mb-4">
-        <label for="exclude_days" class="block text-gray-700 font-medium mb-2">Exclude Days:</label>
-        <select id="exclude_days" name="exclude_days" multiple class="w-full p-2 border border-gray-300 rounded">
-          {% for day in ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] %}
-            <option value="{{ day }}" {% if day in exclude_days %}selected{% endif %}>{{ day }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div id="customSlots" class="mb-4">
-        <label class="block text-gray-700 font-medium mb-2">Exclude Specific Day & Time:</label>
-        {% if exclude_custom %}
-          {% for custom in exclude_custom %}
-          <div class="custom-slot flex space-x-2">
-            <select name="exclude_custom_day[]" class="w-1/3 p-2 border border-gray-300 rounded">
-              {% for day in ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] %}
-                <option value="{{ day }}" {% if day == custom[0] %}selected{% endif %}>{{ day }}</option>
-              {% endfor %}
-            </select>
-            <input type="time" name="exclude_custom_start[]" class="w-1/3 p-2 border border-gray-300 rounded" value="{{ custom[1] }}">
-            <input type="time" name="exclude_custom_end[]" class="w-1/3 p-2 border border-gray-300 rounded" value="{{ custom[2] }}">
-            <button type="button" class="delete-slot">Delete</button>
-          </div>
-          {% endfor %}
-        {% else %}
-          <div class="custom-slot flex space-x-2">
-            <select name="exclude_custom_day[]" class="w-1/3 p-2 border border-gray-300 rounded">
-              {% for day in ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] %}
-                <option value="{{ day }}">{{ day }}</option>
-              {% endfor %}
-            </select>
-            <input type="time" name="exclude_custom_start[]" class="w-1/3 p-2 border border-gray-300 rounded">
-            <input type="time" name="exclude_custom_end[]" class="w-1/3 p-2 border border-gray-300 rounded">
-            <button type="button" class="delete-slot">Delete</button>
-          </div>
-        {% endif %}
-      </div>
-      <div class="mb-4">
-        <button type="button" id="addSlot" class="w-full bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 rounded">
-          Add Another Slot
-        </button>
-      </div>
-      <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded">
-        Generate Schedules
-      </button>
-    </form>
-    <p class="text-center text-xs text-gray-400 mt-4">Course data updates every 24 hours during registration windows.</p>
+    </div>
+  </div>
+  
+  <div class="loading" id="loadingOverlay">
+    <div class="loading-spinner"></div>
+    <p class="text-gray-700">Generating your schedules...</p>
   </div>
   
   <script>
-    let ts1 = new TomSelect("#courses", { maxItems: null, plugins: ['remove_button'] });
-    let ts2 = new TomSelect("#exclude_professors", { maxItems: null, plugins: ['remove_button'] });
-    let ts3 = new TomSelect("#exclude_times", { maxItems: null, plugins: ['remove_button'] });
-    let ts4 = new TomSelect("#exclude_days", { maxItems: null, plugins: ['remove_button'] });
+    // Initialize Tom Select with custom styling and animations
+    let tomSelects = [
+      new TomSelect("#courses", { 
+        maxItems: null,
+        plugins: ['remove_button'],
+        render: {
+          option: function(data, escape) {
+            return `<div class="py-2 px-3 option">${escape(data.text)}</div>`;
+          },
+          item: function(data, escape) {
+            return `<div class="item py-1 px-2">${escape(data.text)}</div>`;
+          }
+        }
+      }),
+      new TomSelect("#exclude_professors", { 
+        maxItems: null,
+        plugins: ['remove_button']
+      }),
+      new TomSelect("#exclude_times", { 
+        maxItems: null,
+        plugins: ['remove_button']
+      }),
+      new TomSelect("#exclude_days", { 
+        maxItems: null,
+        plugins: ['remove_button']
+      })
+    ];
     
+    // Add slot functionality
     document.getElementById("addSlot").addEventListener("click", function() {
       let container = document.getElementById("customSlots");
       let newSlot = document.createElement("div");
-      newSlot.className = "custom-slot flex space-x-2 mt-2";
+      newSlot.className = "custom-slot flex space-x-2";
       newSlot.innerHTML = `
-        <select name="exclude_custom_day[]" class="w-1/3 p-2 border border-gray-300 rounded">
+        <select name="exclude_custom_day[]" class="w-1/3 p-2 border border-gray-200 rounded-md">
           <option value="Sunday">Sunday</option>
           <option value="Monday">Monday</option>
           <option value="Tuesday">Tuesday</option>
@@ -417,17 +653,46 @@ form_template = """
           <option value="Friday">Friday</option>
           <option value="Saturday">Saturday</option>
         </select>
-        <input type="time" name="exclude_custom_start[]" class="w-1/3 p-2 border border-gray-300 rounded">
-        <input type="time" name="exclude_custom_end[]" class="w-1/3 p-2 border border-gray-300 rounded">
+        <input type="time" name="exclude_custom_start[]" class="w-1/3 p-2 border border-gray-200 rounded-md">
+        <input type="time" name="exclude_custom_end[]" class="w-1/3 p-2 border border-gray-200 rounded-md">
         <button type="button" class="delete-slot">Delete</button>
       `;
       container.appendChild(newSlot);
     });
     
+    // Delete slot functionality
     document.getElementById("customSlots").addEventListener("click", function(e) {
       if (e.target && e.target.classList.contains("delete-slot")) {
-        e.target.parentElement.remove();
+        const slotToRemove = e.target.parentElement;
+        slotToRemove.style.opacity = '0';
+        slotToRemove.style.transform = 'translateX(-20px)';
+        slotToRemove.style.transition = 'all 0.3s ease';
+        
+        // Remove after animation completes
+        setTimeout(() => {
+          slotToRemove.remove();
+        }, 300);
       }
+    });
+    
+    // Form submission with loading overlay
+    document.getElementById("courseForm").addEventListener("submit", function() {
+      document.getElementById("loadingOverlay").style.display = "flex";
+    });
+    
+    // Animate form elements on load
+    document.addEventListener("DOMContentLoaded", function() {
+      const formElements = document.querySelectorAll(".select-container");
+      formElements.forEach((element, index) => {
+        element.style.opacity = '0';
+        element.style.transform = 'translateY(20px)';
+        element.style.transition = 'all 0.3s ease';
+        
+        setTimeout(() => {
+          element.style.opacity = '1';
+          element.style.transform = 'translateY(0)';
+        }, 100 + (index * 100));
+      });
     });
   </script>
 </body>
@@ -440,112 +705,467 @@ result_template = """
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Course Schedule Results</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CSULB Schedule Results</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #e4e9f2 100%);
+      min-height: 100vh;
+    }
+    
+    .page-container {
+      animation: fadeIn 0.8s ease-in-out;
+      padding: 2rem 1rem;
+    }
+    
+    .results-container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+      overflow: hidden;
+    }
+    
+    .header-section {
+      background: linear-gradient(to right, #3b82f6, #60a5fa);
+      padding: 1.5rem;
+      color: white;
+      border-radius: 12px 12px 0 0;
+    }
+    
+    .back-button {
+      background-color: #475569;
+      transition: all 0.2s ease;
+    }
+    
+    .back-button:hover {
+      background-color: #334155;
+      transform: translateY(-1px);
+    }
+    
+    .stats-container {
+      background-color: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 1rem;
+    }
+    
+    .online-container {
+      border: 2px solid #22c55e;
+      border-radius: 8px;
+      background-color: #f0fdf4;
+      transition: all 0.3s ease;
+    }
+    
+    .online-container:hover {
+      box-shadow: 0 4px 12px rgba(34, 197, 94, 0.15);
+      transform: translateY(-2px);
+    }
+    
+    .schedule-pattern {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      transition: all 0.3s ease;
+      margin-bottom: 1.5rem;
+      overflow: hidden;
+    }
+    
+    .schedule-pattern:hover {
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      transform: translateY(-2px);
+    }
+    
+    .pattern-header {
+      background-color: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 1rem;
+    }
+    
+    .pattern-content {
+      padding: 1rem;
+    }
+    
+    .day-time-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 0.5rem;
+      margin: 0.5rem 0;
+      padding: 0.5rem;
+      background-color: #f8fafc;
+      border-radius: 6px;
+    }
+    
+    .day-time-item {
+      padding: 0.5rem;
+      border-radius: 4px;
+      background-color: white;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    
+    .calendar-container {
+      margin-top: 1rem;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    
+    .calendar-header {
+      background-color: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 0.75rem;
+    }
+    
+    .calendar-content {
+      padding: 0.75rem;
+    }
+    
+    /* Calendar item colors with enhanced styling */
+    .bg-red-100 { background-color: #fee2e2; border-left: 3px solid #ef4444; }
+    .bg-blue-100 { background-color: #dbeafe; border-left: 3px solid #3b82f6; }
+    .bg-green-100 { background-color: #dcfce7; border-left: 3px solid #22c55e; }
+    .bg-yellow-100 { background-color: #fef9c3; border-left: 3px solid #eab308; }
+    .bg-purple-100 { background-color: #f3e8ff; border-left: 3px solid #a855f7; }
+    .bg-pink-100 { background-color: #fce7f3; border-left: 3px solid #ec4899; }
+    .bg-indigo-100 { background-color: #e0e7ff; border-left: 3px solid #6366f1; }
+    .bg-teal-100 { background-color: #ccfbf1; border-left: 3px solid #14b8a6; }
+    .bg-orange-100 { background-color: #ffedd5; border-left: 3px solid #f97316; }
+    
+    .pagination {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 2rem 0;
+      padding: 1rem;
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    .page-button {
+      background: linear-gradient(to right, #2563eb, #3b82f6);
+      transition: all 0.3s ease;
+    }
+    
+    .page-button:hover {
+      background: linear-gradient(to right, #1d4ed8, #2563eb);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2);
+    }
+    
+    .no-schedules {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: #ef4444;
+      border: 2px dashed #fecaca;
+      border-radius: 8px;
+      background-color: #fef2f2;
+      margin: 2rem 0;
+    }
+    
+    /* Animation keyframes */
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    /* Calendar view enhancements */
+    .calendar-grid {
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    
+    .day-column {
+      border-radius: 0;
+    }
+    
+    .day-header {
+      font-weight: 600;
+      text-align: center;
+      padding: 0.75rem 0;
+      background-color: #f8fafc;
+      border-bottom: 2px solid #e2e8f0;
+    }
+    
+    .calendar-event {
+      margin-bottom: 0.5rem;
+      border-radius: 6px;
+      padding: 0.75rem;
+      transition: all 0.2s ease;
+    }
+    
+    .calendar-event:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+    }
+    
+    .event-title {
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+    
+    .event-detail {
+      font-size: 0.75rem;
+      margin-bottom: 0.15rem;
+    }
+    
+    .event-professor {
+      font-weight: 500;
+    }
+    
+    .event-rating {
+      font-size: 0.7rem;
+      padding: 0.2rem 0;
+    }
+    
+    .event-rating a {
+      color: #4b5563;
+      text-decoration: none;
+      padding: 2px 4px;
+      border-radius: 4px;
+      background-color: rgba(255,255,255,0.6);
+      transition: all 0.2s ease;
+    }
+    
+    .event-rating a:hover {
+      background-color: white;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      color: #1e40af;
+    }
+    
+    .empty-day {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 60px;
+      color: #9ca3af;
+      font-size: 0.75rem;
+    }
+  </style>
 </head>
-<body class="bg-gray-100">
-  <div class="max-w-5xl mx-auto p-6 mt-10 bg-white rounded-lg shadow-lg">
-    <!-- Top Back Button -->
-    <div class="mb-4">
-      <a href="{{ url_for('index') }}" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
-        Back to Form
-      </a>
-    </div>
-    <h1 class="text-2xl font-bold text-center mb-6">Generated Course Schedules (Weekly Calendar)</h1>
-    {% if online_sections %}
-      <div class="mb-6 p-4 border border-green-500 rounded bg-green-50">
-        <h2 class="text-xl font-semibold text-center">Online Classes (No Meeting Times)</h2>
-        <ul>
-          {% for code, sections in online_sections.items() %}
-            <li class="mt-2">
-              <strong>{{ code }}:</strong>
-              {% for sec in sections %}
-                {{ sec[4] }} - {{ sec[8] }}
-                {% if not loop.last %}<br>{% endif %}
-              {% endfor %}
-            </li>
-          {% endfor %}
-        </ul>
+<body>
+  <div class="page-container">
+    <div class="max-w-6xl mx-auto results-container animate__animated animate__fadeIn">
+      <div class="header-section">
+        <div class="flex justify-between items-center">
+          <a href="{{ url_for('index') }}" class="back-button text-white font-bold py-2 px-4 rounded inline-flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+            </svg>
+            Back to Form
+          </a>
+          <h1 class="text-xl md:text-2xl font-bold">CSULB Course Schedules</h1>
+          <div class="w-28"></div> <!-- Spacer for flex alignment -->
+        </div>
       </div>
-    {% endif %}
-    {% if groups %}
-      <h2 class="text-xl font-semibold text-center mb-4">
-        Total Valid Combinations: {{ total_valid }} | Unique Schedules: {{ total_unique }} | 
-        Displayed Schedule Patterns: {{ groups|length }} | 
-        Total Schedules On This Page: {% set count = namespace(value=0) %}
-        {% for _, calendars in groups.items() %}{% set count.value = count.value + calendars|length %}{% endfor %}
-        {{ count.value }}
-      </h2>
-      {% if total_count > 100 %}
-        <p class="text-center text-sm text-gray-500 mb-4">
-          Showing first 20 schedule patterns out of {{ total_count }} valid combinations.
-        </p>
-        <p class="text-center text-sm text-gray-500 mb-4">
-          Use filters to narrow down the list of available course schedules and quickly find the options that best fit your needs.
-        </p>
-      {% endif %}
-      {% for sig, calendars in groups.items() %}
-        <div class="mb-6 border p-4 rounded">
-          <h3 class="font-bold mb-2">
-            Schedule Pattern {{ loop.index }}: ({{ calendars|length }} schedule{% if calendars|length > 1 %}s{% endif %})
-          </h3>
-          <!-- Day/Time Grid for the Pattern -->
-          <div class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
-            {% for day, time in sig %}
-              <div class="flex items-center">
-                <span class="w-24 font-semibold">{{ day }}:</span>
-                <span>{{ time }}</span>
-              </div>
-            {% endfor %}
+      
+      <div class="p-6">
+        {% if online_sections %}
+          <div class="online-container p-4 mb-6 animate__animated animate__fadeInUp">
+            <h2 class="text-xl font-semibold text-center text-green-700">Online Classes (No Meeting Times)</h2>
+            <ul class="mt-3 space-y-2">
+              {% for code, sections in online_sections.items() %}
+                <li class="p-2 bg-white rounded-md shadow-sm">
+                  <strong class="text-green-700">{{ code }}:</strong>
+                  {% for sec in sections %}
+                    <span class="ml-2">{{ sec[4] }} - {{ sec[8] }}</span>
+                    {% if not loop.last %}<br class="ml-6">{% endif %}
+                  {% endfor %}
+                </li>
+              {% endfor %}
+            </ul>
           </div>
-          <!-- List Each Calendar with a Label -->
-          {% for calendar in calendars %}
-            <div class="mt-4 border p-2">
-              <div class="font-semibold mb-2">Schedule {{ loop.index }}:</div>
-              <div>
-                {{ calendar | safe }}
+        {% endif %}
+        
+        {% if groups %}
+          <div class="stats-container rounded-md mb-6 animate__animated animate__fadeInUp animate__delay-1s">
+            <h2 class="text-lg font-semibold text-center text-gray-700">Schedule Statistics</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3 text-center">
+              <div class="stat-item p-3 bg-white rounded-md shadow-sm">
+                <div class="text-sm text-gray-500">Total Valid Combinations</div>
+                <div class="text-xl font-bold text-blue-600">{{ total_valid }}</div>
+              </div>
+              <div class="stat-item p-3 bg-white rounded-md shadow-sm">
+                <div class="text-sm text-gray-500">Unique Schedules</div>
+                <div class="text-xl font-bold text-blue-600">{{ total_unique }}</div>
+              </div>
+              <div class="stat-item p-3 bg-white rounded-md shadow-sm">
+                <div class="text-sm text-gray-500">Schedule Patterns</div>
+                <div class="text-xl font-bold text-blue-600">{{ groups|length }}</div>
               </div>
             </div>
+          </div>
+          
+          {% if total_count > 100 %}
+            <div class="info-message p-3 bg-blue-50 border border-blue-200 rounded-md mb-6 text-center animate__animated animate__fadeIn animate__delay-1s">
+              <p class="text-blue-700">
+                Showing {{ groups|length }} schedule patterns out of {{ total_count }} valid combinations.
+                <br>Use filters to narrow down your options.
+              </p>
+            </div>
+          {% endif %}
+          
+          {% for sig, calendars in groups.items() %}
+            <div class="schedule-pattern animate__animated animate__fadeInUp animate__delay-1s" style="animation-delay: {{ loop.index * 0.1 + 0.5 }}s">
+              <div class="pattern-header">
+                <h3 class="font-bold text-lg flex items-center">
+                  <span class="inline-flex items-center justify-center h-6 w-6 rounded-full bg-blue-100 text-blue-800 mr-2 text-sm">
+                    {{ loop.index }}
+                  </span>
+                  Schedule Pattern: {{ calendars|length }} schedule{% if calendars|length > 1 %}s{% endif %}
+                </h3>
+                
+                <div class="day-time-grid mt-2">
+                  {% for day, time in sig %}
+                    <div class="day-time-item">
+                      <span class="font-medium text-gray-700">{{ day }}:</span>
+                      <span class="text-gray-600">{{ time }}</span>
+                    </div>
+                  {% endfor %}
+                </div>
+              </div>
+              
+              {% for calendar in calendars %}
+                <div class="calendar-container m-4 shadow-sm animate__animated animate__fadeIn" style="animation-delay: {{ loop.index * 0.1 }}s">
+                  <div class="calendar-header flex justify-between items-center">
+                    <h4 class="font-medium text-gray-700">Schedule {{ loop.index }}</h4>
+                    <span class="text-xs text-gray-500">Click course blocks for details</span>
+                  </div>
+                  <div class="calendar-content">
+                    {{ calendar | safe }}
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
           {% endfor %}
-        </div>
-      {% endfor %}
-      
-      {% if total_pages > 1 %}
-        <div class="flex justify-between items-center mt-8 mb-4">
-          {% if current_page > 1 %}
-            <a href="{{ url_for('generate') }}?page={{ current_page - 1 }}&key={{ cache_key }}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-              &larr; Previous
-            </a>
-          {% else %}
-            <span></span>
+          
+          {% if total_pages > 1 %}
+            <div class="pagination animate__animated animate__fadeInUp animate__delay-2s">
+              <div class="flex items-center space-x-2">
+                {% if current_page > 1 %}
+                  <a href="{{ url_for('generate') }}?page=1&key={{ cache_key }}" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm">First</a>
+                  <a href="{{ url_for('generate') }}?page={{ current_page - 1 }}&key={{ cache_key }}" class="page-button text-white font-medium py-2 px-4 rounded inline-flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                    </svg>
+                    Previous
+                  </a>
+                {% else %}
+                  <button disabled class="px-3 py-1 bg-gray-100 rounded text-gray-400 cursor-not-allowed text-sm">First</button>
+                  <button disabled class="bg-gray-300 text-gray-500 font-medium py-2 px-4 rounded inline-flex items-center cursor-not-allowed">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                    </svg>
+                    Previous
+                  </button>
+                {% endif %}
+              </div>
+              
+              <div class="text-center">
+                <span class="px-3 py-1 bg-blue-100 rounded-full text-blue-800 font-medium">
+                  Page {{ current_page }} of {{ total_pages }}
+                </span>
+              </div>
+              
+              <div class="flex items-center space-x-2">
+                {% if current_page < total_pages %}
+                  <a href="{{ url_for('generate') }}?page={{ current_page + 1 }}&key={{ cache_key }}" class="page-button text-white font-medium py-2 px-4 rounded inline-flex items-center">
+                    Next
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 ml-1" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                    </svg>
+                  </a>
+                  <a href="{{ url_for('generate') }}?page={{ total_pages }}&key={{ cache_key }}" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm">Last</a>
+                {% else %}
+                  <button disabled class="bg-gray-300 text-gray-500 font-medium py-2 px-4 rounded inline-flex items-center cursor-not-allowed">
+                    Next
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 ml-1" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                    </svg>
+                  </button>
+                  <button disabled class="px-3 py-1 bg-gray-100 rounded text-gray-400 cursor-not-allowed text-sm">Last</button>
+                {% endif %}
+              </div>
+            </div>
           {% endif %}
           
-          <span class="text-gray-700">
-            Page {{ current_page }} of {{ total_pages }}
-          </span>
-          
-          {% if current_page < total_pages %}
-            <a href="{{ url_for('generate') }}?page={{ current_page + 1 }}&key={{ cache_key }}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-              Next &rarr;
+        {% else %}
+          <div class="no-schedules animate__animated animate__fadeIn">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto text-red-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <h2 class="text-xl font-bold mb-2">No Valid Schedules Found</h2>
+            <p class="text-gray-600">
+              No valid schedules were found with your current selection criteria. 
+              Try removing some filters or selecting different courses.
+            </p>
+            <a href="{{ url_for('index') }}" class="mt-4 inline-block bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded transition-all">
+              Return to Form
             </a>
-          {% else %}
-            <span></span>
-          {% endif %}
-        </div>
-      {% endif %}
-      
-    {% else %}
-      <div class="text-center text-red-600">
-        No valid in-person schedules available for the selected classes.
+          </div>
+        {% endif %}
       </div>
-    {% endif %}
-    <!-- Bottom Back Button -->
-    <div class="mt-6 text-center">
-      <a href="{{ url_for('index') }}" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
-        Back
-      </a>
+      
+      <div class="p-6 text-center border-t border-gray-200">
+        <a href="{{ url_for('index') }}" class="back-button text-white font-bold py-2 px-6 rounded inline-flex items-center">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+          </svg>
+          Back to Form
+        </a>
+      </div>
     </div>
   </div>
+  
+  <script>
+    // Add event listeners to make calendar events interactive
+    document.addEventListener('DOMContentLoaded', function() {
+      // Make calendar events expandable on click
+      const calendarEvents = document.querySelectorAll('[class*="bg-"][class*="-100"].p-2.rounded');
+      calendarEvents.forEach(event => {
+        event.style.cursor = 'pointer';
+        event.addEventListener('click', function() {
+          this.classList.toggle('shadow-md');
+          
+          // Animate the expansion
+          if (this.style.maxHeight) {
+            this.style.maxHeight = null;
+          } else {
+            this.style.maxHeight = this.scrollHeight + "px";
+          }
+        });
+      });
+      
+      // Animate schedule patterns on scroll
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('animate__fadeInUp');
+            entry.target.style.opacity = 1;
+            observer.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1 });
+      
+      document.querySelectorAll('.schedule-pattern').forEach(pattern => {
+        pattern.style.opacity = 0;
+        observer.observe(pattern);
+      });
+    });
+  </script>
 </body>
 </html>
 """
