@@ -1046,7 +1046,6 @@ result_template = """
                 <div class="calendar-container m-4 shadow-sm animate__animated animate__fadeIn" style="animation-delay: {{ loop.index * 0.1 }}s">
                   <div class="calendar-header flex justify-between items-center">
                     <h4 class="font-medium text-gray-700">Schedule {{ loop.index }}</h4>
-                    <span class="text-xs text-gray-500">Click course blocks for details</span>
                   </div>
                   <div class="calendar-content">
                     {{ calendar | safe }}
@@ -1135,24 +1134,6 @@ result_template = """
   </div>
   
   <script>
-    // Add event listeners to make calendar events interactive
-    document.addEventListener('DOMContentLoaded', function() {
-      // Make calendar events expandable on click
-      const calendarEvents = document.querySelectorAll('[class*="bg-"][class*="-100"].p-2.rounded');
-      calendarEvents.forEach(event => {
-        event.style.cursor = 'pointer';
-        event.addEventListener('click', function() {
-          this.classList.toggle('shadow-md');
-          
-          // Animate the expansion
-          if (this.style.maxHeight) {
-            this.style.maxHeight = null;
-          } else {
-            this.style.maxHeight = this.scrollHeight + "px";
-          }
-        });
-      });
-      
       // Animate schedule patterns on scroll
       const observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
